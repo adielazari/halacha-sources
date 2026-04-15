@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const chelek = searchParams.get("chelek");
   const siman = searchParams.get("siman");
+  const status = searchParams.get("status") ?? "approved";
 
   if (!chelek || !siman) {
     return NextResponse.json(
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const annotations = getAllAnnotations(chelek, siman);
+    const annotations = getAllAnnotations(chelek, siman, status);
     return NextResponse.json({ annotations });
   } catch (err) {
     console.error("GET /api/annotations error:", err);
