@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import type { Annotation, CommentaryEntry } from "./types";
 
-// Singleton via globalThis to survive Next.js HMR
 const globalForDb = globalThis as unknown as { __db?: Database.Database };
 
 function getDb(): Database.Database {
@@ -13,6 +12,7 @@ function getDb(): Database.Database {
     const dbPath = path.join(dbDir, "annotations.db");
     const db = new Database(dbPath);
     db.pragma("journal_mode = WAL");
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS annotations (
         id             TEXT PRIMARY KEY,
@@ -27,18 +27,31 @@ function getDb(): Database.Database {
         highlight_text TEXT,
         section_html   TEXT,
         user_name      TEXT DEFAULT 'anonymous',
-        approved       INTEGER DEFAULT 1,
+        status         TEXT NOT NULL DEFAULT 'pending',
         created_at     TEXT DEFAULT (datetime('now')),
         updated_at     TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_annotations_siman ON annotations(chelek, siman);
     `);
+
+    // Migration for existing DBs that have 'approved' instead of 'status'
+    const cols = db.pragma("table_info(annotations)") as { name: string }[];
+    const hasStatus = cols.some((c) => c.name === "status");
+    const hasApproved = cols.some((c) => c.name === "approved");
+    if (!hasStatus) {
+      db.exec("ALTER TABLE annotations ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+      if (hasApproved) {
+        db.exec(
+          "UPDATE annotations SET status = CASE WHEN approved = 1 THEN 'approved' ELSE 'pending' END"
+        );
+      }
+    }
+
     globalForDb.__db = db;
   }
   return globalForDb.__db;
 }
 
-// Row shape from SQLite (snake_case, integers for booleans)
 type DbRow = {
   id: string;
   chelek: string;
@@ -52,7 +65,7 @@ type DbRow = {
   highlight_text: string | null;
   section_html: string | null;
   user_name: string;
-  approved: number;
+  status: string;
   created_at: string;
   updated_at: string;
 };
@@ -60,6 +73,9 @@ type DbRow = {
 function rowToAnnotation(row: DbRow): Annotation {
   let commentaries: CommentaryEntry[] = [];
   try { commentaries = JSON.parse(row.commentaries) as CommentaryEntry[]; } catch { /* empty */ }
+  const status = (["pending", "approved", "rejected"].includes(row.status)
+    ? row.status
+    : "pending") as Annotation["status"];
   return {
     id: row.id,
     chelek: row.chelek,
@@ -73,17 +89,39 @@ function rowToAnnotation(row: DbRow): Annotation {
     highlightText: row.highlight_text,
     sectionHtml: row.section_html,
     userName: row.user_name,
-    approved: row.approved === 1,
+    status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-export function getAllAnnotations(chelek: string, siman: string): Annotation[] {
+export function getAllAnnotations(
+  chelek: string,
+  siman: string,
+  status?: string
+): Annotation[] {
   const db = getDb();
-  const rows = db.prepare(
-    "SELECT * FROM annotations WHERE chelek = ? AND siman = ? ORDER BY created_at ASC"
-  ).all(chelek, siman) as DbRow[];
+  let query = "SELECT * FROM annotations WHERE chelek = ? AND siman = ?";
+  const params: unknown[] = [chelek, siman];
+  if (status && status !== "all") {
+    query += " AND status = ?";
+    params.push(status);
+  }
+  query += " ORDER BY created_at ASC";
+  const rows = db.prepare(query).all(...params) as DbRow[];
+  return rows.map(rowToAnnotation);
+}
+
+export function getAllAnnotationsAdmin(status?: string): Annotation[] {
+  const db = getDb();
+  let query = "SELECT * FROM annotations";
+  const params: unknown[] = [];
+  if (status && status !== "all") {
+    query += " WHERE status = ?";
+    params.push(status);
+  }
+  query += " ORDER BY created_at DESC";
+  const rows = db.prepare(query).all(...params) as DbRow[];
   return rows.map(rowToAnnotation);
 }
 
@@ -111,8 +149,10 @@ export type CreateAnnotationData = {
 export function createAnnotation(data: CreateAnnotationData): Annotation {
   const db = getDb();
   db.prepare(`
-    INSERT INTO annotations (id, chelek, siman, source_key, source_label, text, source_ref, commentaries, section_index, highlight_text, section_html, user_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO annotations
+      (id, chelek, siman, source_key, source_label, text, source_ref,
+       commentaries, section_index, highlight_text, section_html, user_name, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(
     data.id,
     data.chelek,
@@ -139,7 +179,7 @@ export type UpdateAnnotationData = Partial<{
   highlightText: string | null;
   sectionHtml: string | null;
   userName: string;
-  approved: boolean;
+  status: "pending" | "approved" | "rejected";
 }>;
 
 export function updateAnnotation(id: string, data: UpdateAnnotationData): Annotation | null {
@@ -155,7 +195,7 @@ export function updateAnnotation(id: string, data: UpdateAnnotationData): Annota
   if (data.highlightText !== undefined) { fields.push("highlight_text = ?"); values.push(data.highlightText); }
   if (data.sectionHtml !== undefined) { fields.push("section_html = ?"); values.push(data.sectionHtml); }
   if (data.userName !== undefined) { fields.push("user_name = ?"); values.push(data.userName); }
-  if (data.approved !== undefined) { fields.push("approved = ?"); values.push(data.approved ? 1 : 0); }
+  if (data.status !== undefined) { fields.push("status = ?"); values.push(data.status); }
 
   if (fields.length === 0) return getAnnotation(id);
 

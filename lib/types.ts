@@ -4,7 +4,7 @@ export type CommentaryEntry = {
   text: string;
 };
 
-export type DocItemType = "source" | "explanation" | "question" | "answer";
+export type DocItemType = "source" | "explanation" | "question" | "answer" | "heading";
 
 export type Excerpt = {
   id: string;
@@ -18,6 +18,8 @@ export type Excerpt = {
   sourceRef?: string;
   commentaries?: CommentaryEntry[];
   parentId?: string;           // for answers: links to the parent question's id
+  headingLevel?: 1 | 2 | 3;                   // for heading type: 1=large 2=medium 3=small
+  headingAlign?: "right" | "center" | "left"; // for heading type: text alignment
 };
 
 export type Annotation = {
@@ -33,7 +35,7 @@ export type Annotation = {
   highlightText: string | null;
   sectionHtml: string | null;
   userName: string;
-  approved: boolean;
+  status: "pending" | "approved" | "rejected";
   createdAt: string;
   updatedAt: string;
 };
