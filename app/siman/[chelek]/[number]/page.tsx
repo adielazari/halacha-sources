@@ -57,6 +57,12 @@ type HeadingDialogState = {
   level: 1 | 2 | 3;
 } | null;
 
+function decodeHtml(html: string): string {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent ?? html;
+}
+
 function buildSections(
   _sourceKey: string,
   texts: string[]
@@ -148,7 +154,7 @@ export default function SimanPage() {
           sourceKey: params.sourceKey,
           sourceLabel: params.sourceLabel,
           text: params.text,
-          highlightText: params.text.replace(/<[^>]+>/g, ""),
+          highlightText: decodeHtml(params.text.replace(/<[^>]+>/g, "")),
           sectionIndex: params.sectionIndex ?? null,
           userName: currentUser,
         }),
@@ -196,7 +202,7 @@ export default function SimanPage() {
           sourceKey: params.sourceKey,
           sourceLabel: params.sourceLabel,
           text: params.text,
-          highlightText: params.text.replace(/<[^>]+>/g, ""),
+          highlightText: decodeHtml(params.text.replace(/<[^>]+>/g, "")),
           sourceRef: params.sourceRef ?? null,
           commentaries: params.commentaries ?? [],
           userName: currentUser,

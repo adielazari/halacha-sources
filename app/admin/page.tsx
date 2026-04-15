@@ -66,12 +66,12 @@ export default function AdminPage() {
   async function handleAction(id: string, status: "approved" | "rejected") {
     setActionInFlight(id);
     try {
-      await fetch(`/api/annotations/${id}`, {
+      const r = await fetch(`/api/annotations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      // Optimistic removal from pending list
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setPending((prev) => prev.filter((a) => a.id !== id));
     } catch {
       // silent — item stays in list, user can retry
