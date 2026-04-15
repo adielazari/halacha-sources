@@ -11,6 +11,10 @@ import SourcePullView from "@/components/SourcePullView";
 import { buildSourceLabel, buildSectionNumber, getHex } from "@/lib/sourceLabels";
 // buildSourceLabel is used by SelectionPopover via handleDefineSource's sectionLabel
 import { toHebrewNumeral } from "@/lib/hebrewNumerals";
+import { getSimanTopic } from "@/lib/simanTopics";
+import { HeadingToolbar } from "@/components/HeadingToolbar";
+import type { HeadingAlign } from "@/components/HeadingToolbar";
+import { useUser } from "@/lib/userContext";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -46,6 +50,13 @@ export type SourcePullContext = {
   annotation?: Annotation;
 };
 
+/** Small inline dialog for adding a heading from a clickable label */
+type HeadingDialogState = {
+  text: string;
+  align: HeadingAlign;
+  level: 1 | 2 | 3;
+} | null;
+
 function buildSections(
   _sourceKey: string,
   texts: string[]
@@ -56,6 +67,7 @@ function buildSections(
     html,
   }));
 }
+
 
 export default function SimanPage() {
   const params = useParams();
@@ -71,15 +83,18 @@ export default function SimanPage() {
     reorderExcerpts,
     addAnnotation,
     addHeading,
+    updateHeading,
     togglePanel,
     setSession,
     reset,
   } = useStore();
+  const { currentUser } = useUser();
 
   const [texts, setTexts] = useState<TextsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sourcePullContext, setSourcePullContext] = useState<SourcePullContext | null>(null);
+  const [headingDialog, setHeadingDialog] = useState<HeadingDialogState>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   useEffect(() => {
@@ -87,7 +102,7 @@ export default function SimanPage() {
   }, [chelek, number, setSession]);
 
   useEffect(() => {
-    fetch(`/api/annotations?chelek=${chelek}&siman=${number}`)
+    fetch(`/api/annotations?chelek=${chelek}&siman=${number}&status=all`)
       .then((r) => { if (!r.ok) return { annotations: [] }; return r.json(); })
       .then((data: { annotations: Annotation[] }) => setAnnotations(data.annotations ?? []))
       .catch(() => {/* silent */});
@@ -135,6 +150,7 @@ export default function SimanPage() {
           text: params.text,
           highlightText: params.text.replace(/<[^>]+>/g, ""),
           sectionIndex: params.sectionIndex ?? null,
+          userName: currentUser,
         }),
       })
         .then((r) => r.json())
@@ -143,7 +159,7 @@ export default function SimanPage() {
         })
         .catch(() => {});
     },
-    [addExcerpt, chelek, number]
+    [addExcerpt, chelek, number, currentUser]
   );
 
   const handleDefineSource = useCallback(
@@ -183,6 +199,7 @@ export default function SimanPage() {
           highlightText: params.text.replace(/<[^>]+>/g, ""),
           sourceRef: params.sourceRef ?? null,
           commentaries: params.commentaries ?? [],
+          userName: currentUser,
         }),
       })
         .then((r) => r.json())
@@ -192,27 +209,27 @@ export default function SimanPage() {
         .catch(() => {});
       setSourcePullContext(null);
     },
-    [addExcerpt, chelek, number]
+    [addExcerpt, chelek, number, currentUser]
   );
 
-  function handleMarkClick(e: React.MouseEvent) {
-    const mark = (e.target as Element).closest("mark[data-annotation-id]");
-    if (!mark) return;
-    const annotationId = mark.getAttribute("data-annotation-id");
-    const annotation = annotations.find((a) => a.id === annotationId);
-    if (!annotation) return;
-    setSourcePullContext({
-      text: annotation.highlightText ?? annotation.text,
-      sourceKey: annotation.sourceKey,
-      sectionIndex: annotation.sectionIndex ?? undefined,
-      sectionHtml: annotation.sectionHtml ?? undefined,
-      sectionLabel: annotation.sourceLabel,
-      annotation,
-    });
+  // Section label clicked in SA panel → open heading dialog
+  const handleSectionClick = useCallback(
+    (_sourceKey: string, sectionIndex: number, _label: string) => {
+      const seifLabel = `סעיף ${toHebrewNumeral(sectionIndex + 1)}`;
+      setHeadingDialog({ text: seifLabel, align: "right", level: 2 });
+    },
+    []
+  );
+
+  function submitHeadingDialog() {
+    if (!headingDialog?.text.trim()) return;
+    addHeading(null, headingDialog.text.trim(), headingDialog.align, headingDialog.level);
+    setHeadingDialog(null);
   }
 
   const simanLabel = toHebrewNumeral(parseInt(number));
   const chelekLabel = CHELEK_LABELS[chelek] ?? chelek;
+  const topic = getSimanTopic(chelek, parseInt(number));
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50" dir="rtl">
@@ -225,6 +242,7 @@ export default function SimanPage() {
         onReorder={reorderExcerpts}
         onAddAnnotation={addAnnotation}
         onAddHeading={addHeading}
+        onUpdateHeading={updateHeading}
         onReset={reset}
       />
 
@@ -238,13 +256,57 @@ export default function SimanPage() {
           >
             ← בחר סימן
           </button>
-          <div className="flex-1 text-center">
+          <div className="flex-1 text-center flex items-center justify-center gap-2 flex-wrap">
             <span className="font-bold text-gray-800">{chelekLabel}</span>
-            <span className="mx-2 text-gray-300">·</span>
-            <span className="text-gray-600">סימן {simanLabel}</span>
+            <span className="text-gray-300">·</span>
+            {topic && (
+              <>
+                <button
+                  onClick={() => setHeadingDialog({ text: topic, align: "center", level: 1 })}
+                  className="text-gray-600 hover:text-purple-700 hover:underline transition text-sm"
+                  title="הוסף ככותרת"
+                >
+                  {topic}
+                </button>
+                <span className="text-gray-300">·</span>
+              </>
+            )}
+            <button
+              onClick={() => setHeadingDialog({ text: `סימן ${simanLabel}`, align: "center", level: 2 })}
+              className="text-gray-600 hover:text-purple-700 hover:underline transition text-sm"
+              title="הוסף ככותרת"
+            >
+              סימן {simanLabel}
+            </button>
           </div>
           <div className="w-20" />
         </div>
+
+        {/* Heading dialog — inline panel below header */}
+        {headingDialog && (
+          <div className="bg-purple-50 border-b border-purple-200 px-6 py-2 flex items-center gap-3 flex-shrink-0" dir="rtl">
+            <span className="text-xs text-purple-700 font-semibold flex-shrink-0">הוסף ככותרת:</span>
+            <input
+              autoFocus
+              type="text"
+              value={headingDialog.text}
+              onChange={(e) => setHeadingDialog({ ...headingDialog, text: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); submitHeadingDialog(); }
+                if (e.key === "Escape") setHeadingDialog(null);
+              }}
+              className="border border-purple-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 w-44"
+            />
+            <HeadingToolbar
+              align={headingDialog.align}
+              level={headingDialog.level}
+              onAlignChange={(a) => setHeadingDialog({ ...headingDialog, align: a })}
+              onLevelChange={(l) => setHeadingDialog({ ...headingDialog, level: l })}
+            />
+            <button onClick={submitHeadingDialog} className="text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">הוסף</button>
+            <button onClick={() => setHeadingDialog(null)} className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100">ביטול</button>
+          </div>
+        )}
 
         {/* Source pull view — replaces panels */}
         {sourcePullContext && (
@@ -257,7 +319,7 @@ export default function SimanPage() {
 
         {/* Panels area — hidden while source pull is active */}
         {!sourcePullContext && (
-          <div className="flex-1 overflow-y-auto p-4" onClick={handleMarkClick}>
+          <div className="flex-1 overflow-y-auto p-4">
             {loading && (
               <div className="text-center py-16 space-y-3">
                 <div className="text-3xl animate-spin inline-block">⏳</div>
@@ -301,6 +363,7 @@ export default function SimanPage() {
                         onToggle={() => togglePanel(key)}
                         html={texts.tur?.text ?? ""}
                         annotations={annotations.filter((a) => a.sourceKey === key)}
+                        currentUser={currentUser}
                       />
                     );
                   }
@@ -318,6 +381,8 @@ export default function SimanPage() {
                       onToggle={() => togglePanel(key)}
                       sections={sections}
                       annotations={annotations.filter((a) => a.sourceKey === key)}
+                      currentUser={currentUser}
+                      onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
                     />
                   );
                 })}

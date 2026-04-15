@@ -16,8 +16,10 @@ interface TextPanelProps {
   expanded: boolean;
   onToggle: () => void;
   sections?: Section[];
-  html?: string; // single-section (Tur)
+  html?: string;
   annotations?: Annotation[];
+  currentUser?: string;
+  onSectionClick?: (sourceKey: string, sectionIndex: number, label: string) => void;
 }
 
 export default function TextPanel({
@@ -29,6 +31,8 @@ export default function TextPanel({
   sections,
   html,
   annotations,
+  currentUser,
+  onSectionClick,
 }: TextPanelProps) {
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
@@ -55,7 +59,7 @@ export default function TextPanel({
               className="text-sm leading-loose text-gray-800"
               dir="rtl"
               dangerouslySetInnerHTML={{
-                __html: highlightAnnotations(html, annotations ?? [], sourceKey),
+                __html: highlightAnnotations(html, annotations ?? [], sourceKey, undefined, currentUser),
               }}
             />
           ) : sections && sections.length > 0 ? (
@@ -72,9 +76,20 @@ export default function TextPanel({
                     dir="rtl"
                   >
                     {sec.label && (
-                      <strong className="text-xs font-bold" style={{ color: hexColor }}>
-                        {sec.label}{" "}
-                      </strong>
+                      onSectionClick && sourceKey === "shulchanArukh" ? (
+                        <button
+                          onClick={() => onSectionClick(sourceKey, sec.index, sec.label!)}
+                          className="text-xs font-bold hover:underline cursor-pointer transition-opacity hover:opacity-70"
+                          style={{ color: hexColor }}
+                          title="הוסף ככותרת"
+                        >
+                          {sec.label}{" "}
+                        </button>
+                      ) : (
+                        <strong className="text-xs font-bold" style={{ color: hexColor }}>
+                          {sec.label}{" "}
+                        </strong>
+                      )
                     )}
                     <span
                       dangerouslySetInnerHTML={{
@@ -82,7 +97,8 @@ export default function TextPanel({
                           sec.html,
                           annotations ?? [],
                           sourceKey,
-                          sec.index
+                          sec.index,
+                          currentUser
                         ),
                       }}
                     />
