@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 type UserContextType = {
   currentUser: string;
@@ -20,10 +20,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (stored) setCurrentUserState(stored);
   }, []);
 
-  function setCurrentUser(name: string) {
+  const setCurrentUser = useCallback((name: string) => {
     localStorage.setItem("currentUser", name);
     setCurrentUserState(name);
-  }
+  }, []);
 
   return (
     <UserContext.Provider value={{ currentUser, setCurrentUser }}>
