@@ -125,8 +125,9 @@ const PARSHA_ALT = PARSHA_NAMES.slice().sort((a, b) => b.length - a.length).map(
 const RE_PARSHA = new RegExp(`(?:פרשת|פ'|בפ')\\s*(${PARSHA_ALT})`, "g");
 
 // Verse: "chapter:verse" or "פרק X פסוק Y"
+// (?<![א-ת]) prevents matching book names that appear mid-word (e.g. "רות" inside "בכורות")
 const RE_TANAKH_REF = new RegExp(
-  `(${TANAKH_ALT})\\s+(?:פרק\\s+)?([א-ת][׳]?|\\d+)(?:[,:.]\\s*([א-ת][׳]?|\\d+))?`,
+  `(?<![א-ת])(${TANAKH_ALT})\\s+(?:פרק\\s+)?([א-ת]{1,3}[׳״]?|\\d+)(?:[,:.][\\s]*([א-ת]{1,3}[׳״]?|\\d+))?`,
   "g"
 );
 
