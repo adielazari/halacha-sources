@@ -21,7 +21,7 @@ export function highlightAnnotations(
     const escaped = ht.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     result = result.replace(
       new RegExp(escaped, "g"),
-      `<mark data-annotation-id="${ann.id}" class="bg-yellow-200 rounded px-0.5 cursor-pointer hover:bg-yellow-300 transition-colors">${ht}</mark>`
+      `<mark data-annotation-id="${ann.id}" title="${ann.sourceLabel}" class="bg-yellow-200 rounded px-0.5 cursor-pointer hover:bg-yellow-300 transition-colors">${ht}</mark>`
     );
   }
   return result;

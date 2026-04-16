@@ -1,0 +1,19 @@
+{
+  "seifIndex": 14,
+  "seifNumber": 15,
+  "sa": {
+    "html": "<i data-commentator=\"Beur HaGra\" data-order=\"44\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"38\"></i>מותר למכור לעובד כוכבים <i data-commentator=\"Ba'er Hetev\" data-order=\"19\"></i>פירות שני ערלה לשלש שנים <i data-commentator=\"Turei Zahav\" data-order=\"23\"></i>מאחר שלא באו לעולם:",
+    "text": "מותר למכור לעובד כוכבים פירות שני ערלה לשלש שנים מאחר שלא באו לעולם:"
+  },
+  "tur": {
+    "text": "פירות אכל העכו\"ם בשני הערלה כך יאכל הישראל כנגדו אסור שהרי זה כמחליף פירות של ערלה וא\"א הרא\"ש ז\"ל כתב כסברא ראשונה",
+    "startPos": 2780,
+    "endPos": 2895
+  },
+  "beitYosef": [],
+  "alignment": {
+    "confidence": "low",
+    "score": 0.42857142857142855,
+    "needsReview": true
+  }
+}

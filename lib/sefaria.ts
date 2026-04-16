@@ -11,6 +11,7 @@ export type SourceText = {
   ref: string;
   heRef: string;
   text: string;          // Hebrew text (may contain HTML)
+  segments: Array<{ ref: string; text: string }>;
   links?: Link[];
 };
 
@@ -27,6 +28,40 @@ const CHELEK_MAP: Record<string, string> = {
   YorehDeah: "Beit_Yosef%2C_Yoreh_Deah",
   EvenHaEzer: "Beit_Yosef%2C_Even_HaEzer",
   ChoshenMishpat: "Beit_Yosef%2C_Choshen_Mishpat",
+};
+
+const SA_CHELEK_MAP: Record<string, string> = {
+  OrachChayim: "Shulchan_Arukh%2C_Orach_Chayim",
+  YorehDeah: "Shulchan_Arukh%2C_Yoreh_De%27ah",
+  EvenHaEzer: "Shulchan_Arukh%2C_Even_HaEzer",
+  ChoshenMishpat: "Shulchan_Arukh%2C_Choshen_Mishpat",
+};
+
+// null = mefaresh doesn't cover that chelek
+const MEFARESH_CHELEK_MAP: Record<string, Record<string, string | null>> = {
+  shakh: {
+    OrachChayim: "Shakh_on_Shulchan_Arukh%2C_Orach_Chayim",
+    YorehDeah: "Shakh_on_Shulchan_Arukh%2C_Yoreh_De%27ah",
+    EvenHaEzer: null,
+    ChoshenMishpat: "Shakh_on_Shulchan_Arukh%2C_Choshen_Mishpat",
+  },
+  taz: {
+    OrachChayim: "Taz_on_Shulchan_Arukh%2C_Orach_Chayim",
+    YorehDeah: "Taz_on_Shulchan_Arukh%2C_Yoreh_De%27ah",
+    EvenHaEzer: "Taz_on_Shulchan_Arukh%2C_Even_HaEzer",
+    ChoshenMishpat: null,
+  },
+  "pitchei-teshuvah": {
+    OrachChayim: null,
+    YorehDeah: "Pitchei_Teshuva%2C_Yoreh_De%27ah",
+    EvenHaEzer: "Pitchei_Teshuva%2C_Even_HaEzer",
+    ChoshenMishpat: "Pitchei_Teshuva%2C_Choshen_Mishpat",
+  },
+};
+
+export type SeifimText = {
+  ref: string;
+  text: string[];  // one entry per se'if
 };
 
 const SEFARIA_BASE = "https://www.sefaria.org/api/v3/texts";
@@ -84,11 +119,113 @@ export async function fetchSourceText(ref: string): Promise<SourceText> {
   const rawText = heVersion?.text ?? "";
   const text = Array.isArray(rawText) ? rawText.flat().join(" ") : String(rawText);
 
+  let segments: Array<{ ref: string; text: string }> = [];
+  if (Array.isArray(rawText)) {
+    const baseRef = (raw.ref ?? ref).replace(/\s+/g, "_");
+    segments = rawText.map((seg: any, i: number) => {
+      const segText = Array.isArray(seg) ? seg.flat().join(" ") : String(seg ?? "");
+      return { ref: `${baseRef}.${i + 1}`, text: segText };
+    });
+  }
+
   return {
     ref: raw.ref ?? ref,
     heRef: raw.heRef ?? ref,
     text,
+    segments,
   };
+}
+
+export async function fetchShulchanArukh(
+  chelek: string,
+  siman: number
+): Promise<SeifimText> {
+  const chelekKey = SA_CHELEK_MAP[chelek];
+  if (!chelekKey) throw new Error(`Unknown chelek for SA: ${chelek}`);
+
+  const ref = `${chelekKey}.${siman}`;
+  const cacheKey = `sa-${chelek}-${siman}`;
+
+  const raw = await fetchSefaria<any>(ref, cacheKey);
+
+  const versions: any[] = raw.versions ?? [];
+  const heVersion = versions.find((v: any) => v.language === "he") ?? versions[0];
+  const textContent = heVersion?.text ?? [];
+
+  const seifim: string[] = Array.isArray(textContent)
+    ? textContent.map((s: any) => (Array.isArray(s) ? s.join(" ") : String(s ?? "")))
+    : [String(textContent)];
+
+  return { ref: raw.ref ?? ref, text: seifim };
+}
+
+// Returns seifim text for a mefaresh; returns null if mefaresh doesn't cover this chelek.
+export async function fetchMefareshText(
+  mefaresh: string,
+  chelek: string,
+  siman: number
+): Promise<SeifimText | null> {
+  const chelekMap = MEFARESH_CHELEK_MAP[mefaresh];
+  if (!chelekMap) throw new Error(`Unknown mefaresh: ${mefaresh}`);
+
+  const chelekKey = chelekMap[chelek];
+  if (!chelekKey) return null; // mefaresh doesn't cover this chelek
+
+  const ref = `${chelekKey}.${siman}`;
+  const cacheKey = `mefaresh-${mefaresh}-${chelek}-${siman}`;
+
+  try {
+    const raw = await fetchSefaria<any>(ref, cacheKey);
+
+    const versions: any[] = raw.versions ?? [];
+    const heVersion = versions.find((v: any) => v.language === "he") ?? versions[0];
+    const textContent = heVersion?.text ?? [];
+
+    const seifim: string[] = Array.isArray(textContent)
+      ? textContent.map((s: any) => {
+          if (Array.isArray(s)) {
+            // mefarshim are often doubly nested: outer = se'if, inner = individual notes
+            return s.map((note: any) => (Array.isArray(note) ? note.join(" ") : String(note ?? ""))).join(" ");
+          }
+          return String(s ?? "");
+        })
+      : [String(textContent)];
+
+    return { ref: raw.ref ?? ref, text: seifim };
+  } catch {
+    return null;
+  }
+}
+
+const TUR_CHELEK_MAP: Record<string, string> = {
+  OrachChayim: "Tur%2C_Orach_Chayim",
+  YorehDeah: "Tur%2C_Yoreh_Deah",
+  EvenHaEzer: "Tur%2C_Even_HaEzer",
+  ChoshenMishpat: "Tur%2C_Choshen_Mishpat",
+};
+
+// Returns the full siman text as a single HTML string (Tur has 1 element per siman)
+export async function fetchTur(
+  chelek: string,
+  siman: number
+): Promise<{ ref: string; text: string }> {
+  const chelekKey = TUR_CHELEK_MAP[chelek];
+  if (!chelekKey) throw new Error(`Unknown chelek for Tur: ${chelek}`);
+
+  const ref = `${chelekKey}.${siman}`;
+  const cacheKey = `tur-${chelek}-${siman}`;
+
+  const raw = await fetchSefaria<any>(ref, cacheKey);
+
+  const versions: any[] = raw.versions ?? [];
+  const heVersion = versions.find((v: any) => v.language === "he") ?? versions[0];
+  const textContent = heVersion?.text ?? "";
+
+  const text = Array.isArray(textContent)
+    ? textContent.map((s: any) => (Array.isArray(s) ? s.join(" ") : String(s ?? ""))).join(" ")
+    : String(textContent);
+
+  return { ref: raw.ref ?? ref, text };
 }
 
 export async function fetchLinks(ref: string): Promise<Link[]> {

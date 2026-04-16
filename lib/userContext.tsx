@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
 type UserContextType = {
   currentUser: string;
@@ -13,12 +13,14 @@ const UserContext = createContext<UserContextType>({
 });
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUserState] = useState("anonymous");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("currentUser");
-    if (stored) setCurrentUserState(stored);
-  }, []);
+  // Lazy initializer reads localStorage synchronously on the client so the
+  // correct user is available on the very first render — no second-render flash.
+  const [currentUser, setCurrentUserState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("currentUser") ?? "anonymous";
+    }
+    return "anonymous";
+  });
 
   const setCurrentUser = useCallback((name: string) => {
     localStorage.setItem("currentUser", name);

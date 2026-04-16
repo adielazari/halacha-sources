@@ -48,6 +48,10 @@ export type SourcePullContext = {
   sectionHtml?: string;  // full section HTML for the collapsible reference view
   sectionLabel?: string; // label of that section e.g. "ב"י ס"ק ג׳"
   annotation?: Annotation;
+  /** Set when re-editing an existing excerpt — causes save to update in-place */
+  excerptId?: string;
+  /** Pre-load this Sefaria ref into SourcePullView (skips form phase) */
+  preloadRef?: string;
 };
 
 /** Small inline dialog for adding a heading from a clickable label */
@@ -92,6 +96,8 @@ export default function SimanPage() {
     updateHeading,
     togglePanel,
     setSession,
+    setExcerptAnnotationId,
+    updateExcerptFields,
     reset,
   } = useStore();
   const { currentUser } = useUser();
@@ -138,34 +144,52 @@ export default function SimanPage() {
       sectionIndex?: number;
       text: string;
       sourceLabel: string;
+      note?: string;
     }) => {
+      // Direct "הוסף לדף" — adds to the user's document only, no panel highlight annotation.
       addExcerpt({
         sourceKey: params.sourceKey,
         sourceLabel: params.sourceLabel,
         text: params.text,
         sectionIndex: params.sectionIndex,
+        note: params.note,
       });
-      fetch("/api/annotations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chelek,
-          siman: number,
-          sourceKey: params.sourceKey,
-          sourceLabel: params.sourceLabel,
-          text: params.text,
-          highlightText: decodeHtml(params.text.replace(/<[^>]+>/g, "")),
-          sectionIndex: params.sectionIndex ?? null,
-          userName: currentUser,
-        }),
-      })
-        .then((r) => r.json())
-        .then((data: { annotation?: Annotation }) => {
-          if (data.annotation) setAnnotations((prev) => [...prev, data.annotation!]);
-        })
-        .catch(() => {});
     },
-    [addExcerpt, chelek, number, currentUser]
+    [addExcerpt]
+  );
+
+  // Remove excerpt + delete its panel highlight annotation (if any)
+  const handleRemoveExcerpt = useCallback(
+    (id: string) => {
+      const excerpt = excerpts.find((e) => e.id === id);
+      removeExcerpt(id);
+      if (excerpt?.annotationId) {
+        fetch(`/api/annotations/${excerpt.annotationId}`, { method: "DELETE" }).catch(() => {});
+        setAnnotations((prev) => prev.filter((a) => a.id !== excerpt.annotationId));
+      }
+    },
+    [excerpts, removeExcerpt]
+  );
+
+  // Open SourcePullView to re-edit an existing excerpt
+  const handleEditExcerpt = useCallback(
+    (excerptId: string) => {
+      const excerpt = excerpts.find((e) => e.id === excerptId);
+      if (!excerpt) return;
+      // If linked to an annotation, use it (includes sourceRef for auto-fetch)
+      const ann = excerpt.annotationId
+        ? annotations.find((a) => a.id === excerpt.annotationId)
+        : undefined;
+      setSourcePullContext({
+        text: excerpt.text.replace(/<[^>]+>/g, "").slice(0, 300),
+        sourceKey: excerpt.sourceKey,
+        sectionIndex: excerpt.sectionIndex,
+        annotation: ann,
+        preloadRef: ann ? undefined : excerpt.sourceRef,
+        excerptId,
+      });
+    },
+    [excerpts, annotations]
   );
 
   const handleDefineSource = useCallback(
@@ -186,36 +210,128 @@ export default function SimanPage() {
       sourceRef?: string;
       commentaries?: CommentaryEntry[];
     }) => {
-      addExcerpt({
-        sourceKey: params.sourceKey,
-        sourceLabel: params.sourceLabel,
-        text: params.text,
-        sourceRef: params.sourceRef,
-        commentaries: params.commentaries,
-      });
-      fetch("/api/annotations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chelek,
-          siman: number,
+      const panelSnippet = sourcePullContext?.text ?? "";
+      const panelSectionIndex = sourcePullContext?.sectionIndex ?? null;
+      const existingAnnotation = sourcePullContext?.annotation;
+      const editingExcerptId = sourcePullContext?.excerptId;
+
+      if (editingExcerptId) {
+        // Re-editing an existing excerpt — update in place
+        updateExcerptFields(editingExcerptId, {
+          text: params.text,
+          sourceLabel: params.sourceLabel,
+          sourceRef: params.sourceRef,
+          commentaries: params.commentaries,
+        });
+        // Also PATCH the linked annotation if there is one
+        if (existingAnnotation) {
+          fetch(`/api/annotations/${existingAnnotation.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: params.text,
+              sourceLabel: params.sourceLabel,
+              sourceRef: params.sourceRef ?? null,
+              commentaries: params.commentaries ?? [],
+            }),
+          })
+            .then((r) => r.json())
+            .then((data: { annotation?: Annotation }) => {
+              if (data.annotation) {
+                setAnnotations((prev) =>
+                  prev.map((a) => (a.id === existingAnnotation.id ? data.annotation! : a))
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      } else if (existingAnnotation) {
+        // Updating a panel highlight annotation (from mark click) — PATCH, don't add new excerpt
+        fetch(`/api/annotations/${existingAnnotation.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: params.text,
+            sourceLabel: params.sourceLabel,
+            highlightText: panelSnippet ? decodeHtml(panelSnippet.replace(/<[^>]+>/g, "")) : null,
+            sectionIndex: panelSectionIndex,
+            sectionHtml: sourcePullContext?.sectionHtml ?? null,
+            sourceRef: params.sourceRef ?? null,
+            commentaries: params.commentaries ?? [],
+          }),
+        })
+          .then((r) => r.json())
+          .then((data: { annotation?: Annotation }) => {
+            if (data.annotation) {
+              setAnnotations((prev) =>
+                prev.map((a) => (a.id === existingAnnotation.id ? data.annotation! : a))
+              );
+            }
+          })
+          .catch(() => {});
+      } else {
+        // New annotation — pre-generate ID so we can link excerpt ↔ annotation
+        const excerptId = crypto.randomUUID();
+        addExcerpt({
+          id: excerptId,
           sourceKey: params.sourceKey,
           sourceLabel: params.sourceLabel,
           text: params.text,
-          highlightText: decodeHtml(params.text.replace(/<[^>]+>/g, "")),
-          sourceRef: params.sourceRef ?? null,
-          commentaries: params.commentaries ?? [],
-          userName: currentUser,
-        }),
-      })
-        .then((r) => r.json())
-        .then((data: { annotation?: Annotation }) => {
-          if (data.annotation) setAnnotations((prev) => [...prev, data.annotation!]);
+          sourceRef: params.sourceRef,
+          commentaries: params.commentaries,
+        });
+        fetch("/api/annotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chelek,
+            siman: number,
+            sourceKey: params.sourceKey,
+            sourceLabel: params.sourceLabel,
+            text: params.text,
+            // highlightText = the panel snippet the user originally selected,
+            // NOT params.text (the pulled Sefaria source, which can't match panel HTML).
+            highlightText: panelSnippet ? decodeHtml(panelSnippet.replace(/<[^>]+>/g, "")) : null,
+            sectionIndex: panelSectionIndex,
+            sectionHtml: sourcePullContext?.sectionHtml ?? null,
+            sourceRef: params.sourceRef ?? null,
+            commentaries: params.commentaries ?? [],
+            userName: currentUser,
+          }),
         })
-        .catch(() => {});
+          .then((r) => r.json())
+          .then((data: { annotation?: Annotation }) => {
+            if (data.annotation) {
+              setAnnotations((prev) => [...prev, data.annotation!]);
+              setExcerptAnnotationId(excerptId, data.annotation.id);
+            }
+          })
+          .catch(() => {});
+      }
       setSourcePullContext(null);
     },
-    [addExcerpt, chelek, number, currentUser]
+    [addExcerpt, updateExcerptFields, chelek, number, currentUser, sourcePullContext]
+  );
+
+  // Click on a highlighted <mark> → open SourcePullView with annotation pre-loaded
+  const handleMarkClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const mark = target.closest("mark[data-annotation-id]");
+      if (!mark) return;
+      const annId = mark.getAttribute("data-annotation-id");
+      if (!annId) return;
+      const ann = annotations.find((a) => a.id === annId);
+      if (!ann) return;
+      setSourcePullContext({
+        text: ann.highlightText ?? "",
+        sourceKey: ann.sourceKey,
+        sectionIndex: ann.sectionIndex ?? undefined,
+        sectionHtml: ann.sectionHtml ?? undefined,
+        annotation: ann,
+      });
+    },
+    [annotations]
   );
 
   // Section label clicked in SA panel → open heading dialog
@@ -244,7 +360,8 @@ export default function SimanPage() {
         excerpts={excerpts}
         chelek={chelek}
         siman={number}
-        onRemove={removeExcerpt}
+        onRemove={handleRemoveExcerpt}
+        onEdit={handleEditExcerpt}
         onReorder={reorderExcerpts}
         onAddAnnotation={addAnnotation}
         onAddHeading={addHeading}
@@ -325,7 +442,7 @@ export default function SimanPage() {
 
         {/* Panels area — hidden while source pull is active */}
         {!sourcePullContext && (
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4" onClick={handleMarkClick}>
             {loading && (
               <div className="text-center py-16 space-y-3">
                 <div className="text-3xl animate-spin inline-block">⏳</div>

@@ -1,0 +1,24 @@
+{
+  "seifIndex": 23,
+  "seifNumber": 24,
+  "sa": {
+    "html": "<i data-commentator=\"Be'er HaGolah\" data-order=\"60\"></i>הנוטע לצורך מצוה כגון לצורך לולב או אתרוג חייב:",
+    "text": "הנוטע לצורך מצוה כגון לצורך לולב או אתרוג חייב:"
+  },
+  "tur": {
+    "text": "הנוטע לצורך מצוה כגון לצורך לולב או אתרוג חייב",
+    "startPos": 5462,
+    "endPos": 5509
+  },
+  "beitYosef": [
+    {
+      "index": 0,
+      "text": "הנוטע לצורך מצוה וכו' ג\"ז ירושלמי שם: "
+    }
+  ],
+  "alignment": {
+    "confidence": "high",
+    "score": 1,
+    "needsReview": false
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "seifIndex": 9,
+  "seifNumber": 10,
+  "sa": {
+    "html": "<i data-commentator=\"Beur HaGra\" data-order=\"34\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"27\"></i>כרם שהוא ספק ערלה בארץ ישראל אסור ובסוריא מותר ואין צריך לומר בחוצה לארץ:",
+    "text": "כרם שהוא ספק ערלה בארץ ישראל אסור ובסוריא מותר ואין צריך לומר בחוצה לארץ:"
+  },
+  "tur": {
+    "text": "כרם שהוא ספק ערלה שהוא מותר הבית",
+    "startPos": 2239,
+    "endPos": 2272
+  },
+  "beitYosef": [
+    {
+      "index": 0,
+      "text": "חבית של יין הטמונה בכרם של ערל מותר וכו' עובדא פ\"ב דב\"ב (כד.): "
+    }
+  ],
+  "alignment": {
+    "confidence": "medium",
+    "score": 0.5714285714285714,
+    "needsReview": false
+  }
+}

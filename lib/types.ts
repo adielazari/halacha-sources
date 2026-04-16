@@ -16,6 +16,9 @@ export type Excerpt = {
   note?: string;
   // Set when the excerpt is a source pulled from Sefaria via SourcePullView
   sourceRef?: string;
+  // Linked annotation ID — set when created via "הגדר מקור" (SourcePullView). Used to
+  // delete the panel highlight when this excerpt is removed from the document.
+  annotationId?: string;
   commentaries?: CommentaryEntry[];
   parentId?: string;           // for answers: links to the parent question's id
   headingLevel?: 1 | 2 | 3;                   // for heading type: 1=large 2=medium 3=small

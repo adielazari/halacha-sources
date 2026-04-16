@@ -1,0 +1,24 @@
+{
+  "seifIndex": 10,
+  "seifNumber": 11,
+  "sa": {
+    "html": "<i data-commentator=\"Be'er HaGolah\" data-order=\"28\"></i>חבית של יין הטמונה בכרם של ערלה <i data-commentator=\"Siftei Kohen\" data-order=\"22\"></i><i data-commentator=\"Ba'er Hetev\" data-order=\"13\"></i>מותר שאין הגנב גונב מכרם זה <i data-commentator=\"Turei Zahav\" data-order=\"16\"></i>וטומן בתוכו <i data-commentator=\"Turei Zahav\" data-order=\"17\"></i><i data-commentator=\"Beur HaGra\" data-order=\"35\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"29\"></i>אבל ענבים שנמצאו טמונים בו אסורים <i data-commentator=\"Beur HaGra\" data-order=\"36\"></i>שקרוב הדבר שגנבם ממנו וטמנם בתוכו:",
+    "text": "חבית של יין הטמונה בכרם של ערלה מותר שאין הגנב גונב מכרם זה וטומן בתוכו אבל ענבים שנמצאו טמונים בו אסורים שקרוב הדבר שגנבם ממנו וטמנם בתוכו:"
+  },
+  "tur": {
+    "text": "של יין הטמונה בכרם של ערלה מותר שאין הגנב גונב בכרם זה וטומן בתוכו אבל ענבים שנמצאו טמונים בו אסורין שקרוב הדבר שגנבה ממנו וטמנה בתוכו",
+    "startPos": 2272,
+    "endPos": 2407
+  },
+  "beitYosef": [
+    {
+      "index": 0,
+      "text": "ומ\"ש אבל ענבים שנמצאו טמונים בו אסורים וכו' ג\"ז שם: וכתבו התוס' גבי חבית יין וא\"ת מ\"מ יהא אסור דרובא דעלמא נכרים נינהו והוי כי\"נ וי\"ל דרוב גנבים ישראל כדאמרינן בפרק בתרא דע\"ז והרמב\"ן כתב בשם ר\"ח דמותר בהנאה ולא בשתייה וכתב עליו ולא מחוור לן: "
+    }
+  ],
+  "alignment": {
+    "confidence": "high",
+    "score": 0.8571428571428571,
+    "needsReview": false
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "seifIndex": 1,
+  "seifNumber": 2,
+  "sa": {
+    "html": "<i data-commentator=\"Be'er HaGolah\" data-order=\"9\"></i>אבל העלים והלולבים ומי גפנים <i data-commentator=\"Beur HaGra\" data-order=\"10\"></i>דהיינו כשחותכין הגפן נוטף ממנו כמו מים <i data-commentator=\"Siftei Kohen\" data-order=\"6\"></i><i data-commentator=\"Ba'er Hetev\" data-order=\"3\"></i>מותרים משום ערלה:",
+    "text": "אבל העלים והלולבים ומי גפנים דהיינו כשחותכין הגפן נוטף ממנו כמו מים מותרים משום ערלה:"
+  },
+  "tur": {
+    "text": "אבל העלין והלולבין ומי הגפנים פירוש כשחותכין הגפן נוטף ממנו במו מים מותרין משום ערלה",
+    "startPos": 419,
+    "endPos": 504
+  },
+  "beitYosef": [
+    {
+      "index": 0,
+      "text": "ומ\"ש אבל העלים והלולבים ומי גפנים מותרים משנה שכ.: "
+    }
+  ],
+  "alignment": {
+    "confidence": "high",
+    "score": 0.8571428571428571,
+    "needsReview": false
+  }
+}

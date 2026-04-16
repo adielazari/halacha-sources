@@ -1,0 +1,19 @@
+{
+  "seifIndex": 13,
+  "seifNumber": 14,
+  "sa": {
+    "html": "<i data-commentator=\"Turei Zahav\" data-order=\"22\"></i><i data-commentator=\"Siftei Kohen\" data-order=\"30\"></i><i data-commentator=\"Beur HaGra\" data-order=\"43\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"37\"></i>מותר <i data-commentator=\"Ba'er Hetev\" data-order=\"18\"></i>לומר לעובד כוכבים בשני ערלה עבוד כרמי ותטול פירותיה ותן לי כרמך שעברו עליה שני ערלה ואעבדנה ואטול פירותיה:",
+    "text": "מותר לומר לעובד כוכבים בשני ערלה עבוד כרמי ותטול פירותיה ותן לי כרמך שעברו עליה שני ערלה ואעבדנה ואטול פירותיה:"
+  },
+  "tur": {
+    "text": "לומר לנכרי טול אתה שני ערלה ואני אטול שני היתר כנגדן אפילו לא התנו תחלה והר\"מ כתב דוקא שהתנו תחלה שיטול הנכרי שני ערלה וישראל יטול שני היתר כנגדן אבל לא התנו אסור ואפי' אם התנו תחלה אם באו לחשבון לומר כמה",
+    "startPos": 2575,
+    "endPos": 2780
+  },
+  "beitYosef": [],
+  "alignment": {
+    "confidence": "low",
+    "score": 0.42857142857142855,
+    "needsReview": true
+  }
+}
