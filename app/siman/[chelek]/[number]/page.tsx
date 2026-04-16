@@ -513,6 +513,19 @@ export default function SimanPage() {
             )}
           </div>
         )}
+
+        {/* Sefaria attribution */}
+        <div className="flex-shrink-0 px-4 py-1.5 border-t border-gray-100 bg-gray-50 flex justify-end">
+          <a
+            href="https://www.sefaria.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 transition"
+          >
+            מבוסס על נתוני{" "}
+            <span className="font-medium text-teal-600 hover:text-teal-700">ספריא</span>
+          </a>
+        </div>
       </div>
 
       {/* Global floating add button — hidden while source pull is active */}

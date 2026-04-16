@@ -30,28 +30,30 @@ export async function GET(req: NextRequest) {
       fetchMefareshText("pitchei-teshuvah", chelek, siman),
     ]);
 
-  return NextResponse.json({
-    tur:
-      turResult.status === "fulfilled" ? turResult.value : null,
-    beitYosef:
-      byResult.status === "fulfilled"
-        ? { ref: byResult.value.ref, text: byResult.value.text }
-        : null,
-    shulchanArukh:
-      saResult.status === "fulfilled"
-        ? { ref: saResult.value.ref, text: saResult.value.text }
-        : null,
-    taz:
-      tazResult.status === "fulfilled" && tazResult.value
-        ? { ref: tazResult.value.ref, text: tazResult.value.text }
-        : null,
-    shakh:
-      shakhResult.status === "fulfilled" && shakhResult.value
-        ? { ref: shakhResult.value.ref, text: shakhResult.value.text }
-        : null,
-    pitcheiTeshuva:
-      ptResult.status === "fulfilled" && ptResult.value
-        ? { ref: ptResult.value.ref, text: ptResult.value.text }
-        : null,
-  });
+  // Prefetch adjacent simanim in the background — fire and forget, do not await
+  const prefetchSiman = (s: number) => {
+    if (s < 1) return;
+    void Promise.allSettled([
+      fetchTur(chelek, s),
+      fetchBeytYosef(chelek, s),
+      fetchShulchanArukh(chelek, s),
+      fetchMefareshText("taz", chelek, s),
+      fetchMefareshText("shakh", chelek, s),
+      fetchMefareshText("pitchei-teshuvah", chelek, s),
+    ]).catch(() => {});
+  };
+  prefetchSiman(siman - 1);
+  prefetchSiman(siman + 1);
+
+  return NextResponse.json(
+    {
+      tur: turResult.status === "fulfilled" ? turResult.value : null,
+      beitYosef: byResult.status === "fulfilled" ? { ref: byResult.value.ref, text: byResult.value.text } : null,
+      shulchanArukh: saResult.status === "fulfilled" ? { ref: saResult.value.ref, text: saResult.value.text } : null,
+      taz: tazResult.status === "fulfilled" && tazResult.value ? { ref: tazResult.value.ref, text: tazResult.value.text } : null,
+      shakh: shakhResult.status === "fulfilled" && shakhResult.value ? { ref: shakhResult.value.ref, text: shakhResult.value.text } : null,
+      pitcheiTeshuva: ptResult.status === "fulfilled" && ptResult.value ? { ref: ptResult.value.ref, text: ptResult.value.text } : null,
+    },
+    { headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" } }
+  );
 }

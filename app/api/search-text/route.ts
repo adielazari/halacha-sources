@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readCache, writeCache } from "@/lib/cache";
 
 // Tractate English name (with spaces) → full Sefaria path prefix for Bavli
 const BAVLI_PATH: Record<string, string> = {
@@ -83,6 +84,16 @@ export async function GET(req: NextRequest) {
 
     const pathFilter = tractateEn ? buildPathFilter(tractateEn, yerushalmi) : null;
 
+    // Cache key: tractate + query
+    const searchCacheKey = `search-${tractateParam.replace(/[^a-zA-Z0-9]/g, "_")}-${cleanQuery}`;
+    const cachedResults = await readCache<{ ref: string; heRef: string; snippet: string }[]>(searchCacheKey);
+    if (cachedResults) {
+      return NextResponse.json(
+        { results: cachedResults },
+        { headers: { "Cache-Control": "public, max-age=3600" } }
+      );
+    }
+
     const body: Record<string, unknown> = {
       query: cleanQuery,
       type: "text",
@@ -132,7 +143,11 @@ export async function GET(req: NextRequest) {
         return true;
       });
 
-    return NextResponse.json({ results });
+    await writeCache(searchCacheKey, results);
+    return NextResponse.json(
+      { results },
+      { headers: { "Cache-Control": "public, max-age=3600" } }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

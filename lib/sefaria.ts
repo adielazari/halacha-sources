@@ -71,7 +71,7 @@ async function fetchSefaria<T>(ref: string, cacheKey: string): Promise<T> {
   if (cached) return cached;
 
   const url = `${SEFARIA_BASE}/${ref}?context=0&pad=0&language=he`;
-  const res = await fetch(url, { next: { revalidate: 86400 } });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Sefaria API error: ${res.status} for ${ref}`);
   const data: T = await res.json();
   await writeCache(cacheKey, data);
@@ -236,7 +236,7 @@ export async function fetchLinks(ref: string): Promise<Link[]> {
   if (cached) return cached;
 
   const url = `https://www.sefaria.org/api/links/${encoded}?with_text=0`;
-  const res = await fetch(url, { next: { revalidate: 86400 } });
+  const res = await fetch(url);
   if (!res.ok) return [];
   const data: any[] = await res.json();
 

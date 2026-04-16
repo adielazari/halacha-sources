@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
       fetchSourceText(ref),
       withLinks ? fetchLinks(ref) : Promise.resolve([]),
     ]);
-    return NextResponse.json({ ...source, links });
+    return NextResponse.json(
+      { ...source, links },
+      { headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" } }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
