@@ -40,10 +40,10 @@ const SA_CHELEK_MAP: Record<string, string> = {
 // null = mefaresh doesn't cover that chelek
 const MEFARESH_CHELEK_MAP: Record<string, Record<string, string | null>> = {
   shakh: {
-    OrachChayim: "Shakh_on_Shulchan_Arukh%2C_Orach_Chayim",
-    YorehDeah: "Shakh_on_Shulchan_Arukh%2C_Yoreh_De%27ah",
+    OrachChayim: null,
+    YorehDeah: "Siftei_Kohen_on_Shulchan_Arukh%2C_Yoreh_De%27ah",
     EvenHaEzer: null,
-    ChoshenMishpat: "Shakh_on_Shulchan_Arukh%2C_Choshen_Mishpat",
+    ChoshenMishpat: "Siftei_Kohen_on_Shulchan_Arukh%2C_Choshen_Mishpat",
   },
   taz: {
     OrachChayim: "Taz_on_Shulchan_Arukh%2C_Orach_Chayim",

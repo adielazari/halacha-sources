@@ -66,6 +66,7 @@ export const TRACTATE_MAP: Record<string, string> = {
   'כריתות': 'Keritot',
   'מעילה': "Me'ilah",
   'נידה': 'Niddah',
+  'נדה': 'Niddah',
   'ברכות': 'Berakhot',
   'שקלים': 'Shekalim',
   // Mishnaic / Yerushalmi tractates (no Bavli)

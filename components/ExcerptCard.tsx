@@ -175,7 +175,7 @@ export default function ExcerptCard({
           </div>
 
           {/* Controls */}
-          <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+          <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
             <button
               onClick={() => setMenuOpen((o) => !o)}
               className="text-gray-400 hover:text-blue-500 transition text-sm font-bold leading-none hover:bg-blue-50 rounded px-1"
@@ -193,6 +193,7 @@ export default function ExcerptCard({
                 ✎
               </button>
             )}
+            <div className="w-full border-t border-gray-100 my-0.5" />
             <button
               onClick={onRemove}
               className="text-gray-400 hover:text-red-500 transition text-sm leading-none"

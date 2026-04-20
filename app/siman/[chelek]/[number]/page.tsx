@@ -246,7 +246,22 @@ export default function SimanPage() {
             .catch(() => {});
         }
       } else if (existingAnnotation) {
-        // Updating a panel highlight annotation (from mark click) — PATCH, don't add new excerpt
+        // From mark click — if the excerpt was deleted (race condition or explicit remove),
+        // re-add it so the source reappears in the sidebar.
+        const linkedExcerpt = excerpts.find((e) => e.annotationId === existingAnnotation.id);
+        if (!linkedExcerpt) {
+          const newId = crypto.randomUUID();
+          addExcerpt({
+            id: newId,
+            sourceKey: params.sourceKey,
+            sourceLabel: params.sourceLabel,
+            text: params.text,
+            sourceRef: params.sourceRef,
+            commentaries: params.commentaries,
+          });
+          setExcerptAnnotationId(newId, existingAnnotation.id);
+        }
+        // PATCH the annotation regardless
         fetch(`/api/annotations/${existingAnnotation.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -310,7 +325,7 @@ export default function SimanPage() {
       }
       setSourcePullContext(null);
     },
-    [addExcerpt, updateExcerptFields, chelek, number, currentUser, sourcePullContext]
+    [addExcerpt, updateExcerptFields, setExcerptAnnotationId, excerpts, chelek, number, currentUser, sourcePullContext]
   );
 
   // Click on a highlighted <mark> → open SourcePullView with annotation pre-loaded

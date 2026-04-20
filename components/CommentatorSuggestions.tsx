@@ -26,6 +26,7 @@ export default function CommentatorSuggestions({
   const [groups, setGroups] = useState<CommentatorGroup[]>([]);
   const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch links for all segment refs and build groups
   useEffect(() => {
@@ -76,12 +77,13 @@ export default function CommentatorSuggestions({
   async function handleAdd(group: CommentatorGroup) {
     if (addedKeys.has(group.key)) return;
     setLoading(group.key);
+    setLoadError(null);
     try {
       // Fetch all refs in the group and concatenate text
       const texts = await Promise.all(
         group.refs.map((ref) =>
           fetch(`/api/source?ref=${encodeURIComponent(ref)}`)
-            .then((r) => (r.ok ? r.json() : { text: "" }))
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error("שגיאת שרת"))))
             .then((d) => (d.text ?? "") as string)
         )
       );
@@ -89,9 +91,13 @@ export default function CommentatorSuggestions({
         .filter(Boolean)
         .map(t => t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
         .join("\n");
+      if (!combined) {
+        setLoadError(`לא נמצא טקסט עבור ${group.heTitle}`);
+        return;
+      }
       onAdd({ ref: group.key, heRef: group.heTitle, text: combined });
     } catch {
-      // silent
+      setLoadError(`שגיאה בטעינת ${group.heTitle} — בדוק חיבור לאינטרנט`);
     } finally {
       setLoading(null);
     }
@@ -105,7 +111,11 @@ export default function CommentatorSuggestions({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
+      {loadError && (
+        <p className="text-xs text-red-500">{loadError}</p>
+      )}
+      <div className="flex flex-wrap gap-2">
       {groups.map((group) => {
         const isAdded = addedKeys.has(group.key);
         return (
@@ -123,6 +133,7 @@ export default function CommentatorSuggestions({
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

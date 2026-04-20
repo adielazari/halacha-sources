@@ -175,20 +175,8 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     if (book) return { type: "tanakh", book };
   }
 
-  // ── 3. Tanakh book + chapter/verse ───────────────────────────────────────
-  RE_TANAKH_REF.lastIndex = 0;
-  const tanakhM = RE_TANAKH_REF.exec(text);
-  if (tanakhM) {
-    const bookHe = tanakhM[1];
-    const book = TANAKH_SORTED.find((b) => b.he === bookHe);
-    if (book) {
-      const chapter = parseHebLetter(tanakhM[2]) ?? undefined;
-      const verse = tanakhM[3] ? (parseHebLetter(tanakhM[3]) ?? undefined) : undefined;
-      return { type: "tanakh", book, chapter, verse };
-    }
-  }
-
-  // ── 4. Talmud tractate patterns ───────────────────────────────────────────
+  // ── 3. Talmud tractate patterns (checked before Tanakh to avoid mis-matching
+  //    tractate names that contain Tanakh book names, e.g. "בכורות" ⊃ "רות") ──
 
   const isYerushalmi = RE_YER.test(text);
 
@@ -208,7 +196,7 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     return { mishna, halacha };
   }
 
-  // 4a. Chapter + ד + tractate
+  // 3a. Chapter + ד + tractate
   RE_CH_TRAC.lastIndex = 0;
   const m1 = RE_CH_TRAC.exec(text);
   if (m1) {
@@ -230,7 +218,7 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     }
   }
 
-  // 4b. Tractate + daf + amud
+  // 3b. Tractate + daf + amud
   RE_TRAC_DAF.lastIndex = 0;
   const m2 = RE_TRAC_DAF.exec(text);
   if (m2) {
@@ -244,7 +232,7 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     }
   }
 
-  // 4c. Bare ד + tractate
+  // 3c. Bare ד + tractate
   RE_D_TRAC.lastIndex = 0;
   const m3 = RE_D_TRAC.exec(text);
   if (m3) {
@@ -261,7 +249,7 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     }
   }
 
-  // 4d. "מסכת <tractate>"
+  // 3d. "מסכת <tractate>"
   RE_MASECHET.lastIndex = 0;
   const m4 = RE_MASECHET.exec(text);
   if (m4) {
@@ -269,6 +257,19 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     const tractateEn = TRACTATE_MAP[tractateHe];
     if (tractateEn) {
       return { type: typeFor(tractateHe), tractateHe, tractateEn };
+    }
+  }
+
+  // ── 4. Tanakh book + chapter/verse ───────────────────────────────────────
+  RE_TANAKH_REF.lastIndex = 0;
+  const tanakhM = RE_TANAKH_REF.exec(text);
+  if (tanakhM) {
+    const bookHe = tanakhM[1];
+    const book = TANAKH_SORTED.find((b) => b.he === bookHe);
+    if (book) {
+      const chapter = parseHebLetter(tanakhM[2]) ?? undefined;
+      const verse = tanakhM[3] ? (parseHebLetter(tanakhM[3]) ?? undefined) : undefined;
+      return { type: "tanakh", book, chapter, verse };
     }
   }
 
