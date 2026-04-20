@@ -53,9 +53,9 @@ const MEFARESH_CHELEK_MAP: Record<string, Record<string, string | null>> = {
   },
   "pitchei-teshuvah": {
     OrachChayim: null,
-    YorehDeah: "Pitchei_Teshuva%2C_Yoreh_De%27ah",
-    EvenHaEzer: "Pitchei_Teshuva%2C_Even_HaEzer",
-    ChoshenMishpat: "Pitchei_Teshuva%2C_Choshen_Mishpat",
+    YorehDeah: "Pitchei_Teshuva_on_Shulchan_Arukh%2C_Yoreh_De%27ah",
+    EvenHaEzer: "Pitchei_Teshuva_on_Shulchan_Arukh%2C_Even_HaEzer",
+    ChoshenMishpat: "Pitchei_Teshuva_on_Shulchan_Arukh%2C_Choshen_Mishpat",
   },
 };
 
