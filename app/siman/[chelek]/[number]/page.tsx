@@ -24,9 +24,9 @@ const CHELEK_LABELS: Record<string, string> = {
 };
 
 const SOURCE_ORDER = [
-  { key: "shulchanArukh", title: "שולחן ערוך" },
   { key: "tur",           title: "טור" },
   { key: "beitYosef",     title: "בית יוסף" },
+  { key: "shulchanArukh", title: "שולחן ערוך" },
   { key: "taz",           title: 'ט"ז' },
   { key: "shakh",         title: 'ש"ך' },
   { key: "pitcheiTeshuva",title: "פתחי תשובה" },
