@@ -239,6 +239,13 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         if (detected.chapter) setTanakhChapterHe(heNum(detected.chapter));
         if (detected.verse)   setTanakhVerseHe(heNum(detected.verse));
 
+      } else if (detected.type === "rambam") {
+        setSourceType("rambam");
+        setRambamSection(detected.hilkhotHe);
+        setCurrentRambamSection(detected.hilkhotHe);
+        if (detected.chapter) setRambamChapterHe(heNum(detected.chapter));
+        if (detected.halacha) setRambamHalachaHe(heNum(detected.halacha));
+
       } else if (detected.type === "mishna") {
         setSourceType("mishna");
         setTractate(detected.tractateHe);
