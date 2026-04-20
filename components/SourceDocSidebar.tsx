@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { Excerpt, DocItemType } from "@/lib/types";
 import ExcerptCard from "./ExcerptCard";
@@ -33,7 +33,13 @@ export default function SourceDocSidebar({
   onReset,
 }: SourceDocSidebarProps) {
   const dragIndex = useRef<number | null>(null);
+  const dropTargetRef = useRef<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+
+  const updateDropTarget = useCallback((val: number | null) => {
+    dropTargetRef.current = val;
+    setDropTarget(val);
+  }, []);
   const [topHeadingMode, setTopHeadingMode] = useState(false);
   const [topHeadingText, setTopHeadingText] = useState("");
   const [topHeadingAlign, setTopHeadingAlign] = useState<HeadingAlign>("right");
@@ -122,29 +128,28 @@ export default function SourceDocSidebar({
                     onDragStart: (e) => {
                       dragIndex.current = idx;
                       e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(idx));
                     },
                     onDragOver: (e) => {
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "move";
-                      // determine if mouse is in top or bottom half of the card
                       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                       const mid = rect.top + rect.height / 2;
-                      setDropTarget(e.clientY < mid ? idx : idx + 1);
+                      updateDropTarget(e.clientY < mid ? idx : idx + 1);
                     },
                     onDrop: (e) => {
                       e.preventDefault();
                       const from = dragIndex.current;
-                      const to = dropTarget;
-                      setDropTarget(null);
+                      const to = dropTargetRef.current; // always fresh — avoids stale closure
+                      updateDropTarget(null);
                       dragIndex.current = null;
                       if (from !== null && to !== null && from !== to) {
-                        // toIndex after splice: if moving down, subtract 1
                         const insertAt = to > from ? to - 1 : to;
                         if (from !== insertAt) onReorder(from, insertAt);
                       }
                     },
                     onDragEnd: () => {
-                      setDropTarget(null);
+                      updateDropTarget(null);
                       dragIndex.current = null;
                     },
                   }}
