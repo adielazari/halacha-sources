@@ -1,0 +1,19 @@
+{
+  "seifIndex": 27,
+  "seifNumber": 28,
+  "sa": {
+    "html": "<i data-commentator=\"Turei Zahav\" data-order=\"29\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"70\"></i>עובד כוכבים שהיה מוכר פירות ואמר של ערלה הן או של נטע רבעי הן <i data-commentator=\"Siftei Kohen\" data-order=\"36\"></i><i data-commentator=\"Ba'er Hetev\" data-order=\"26\"></i>אינו נאמן <i data-commentator=\"Beur HaGra\" data-order=\"67\"></i><i data-commentator=\"Be'er HaGolah\" data-order=\"71\"></i>ואפילו אמר מאיש פלוני לקחתים:",
+    "text": "עובד כוכבים שהיה מוכר פירות ואמר של ערלה הן או של נטע רבעי הן אינו נאמן ואפילו אמר מאיש פלוני לקחתים:"
+  },
+  "tur": {
+    "text": "",
+    "startPos": 5804,
+    "endPos": 5804
+  },
+  "beitYosef": [],
+  "alignment": {
+    "confidence": "none",
+    "score": 0,
+    "needsReview": true
+  }
+}
