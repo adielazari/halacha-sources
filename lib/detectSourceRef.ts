@@ -7,6 +7,7 @@ import { TRACTATE_MAP, MISHNAH_ONLY_TRACTATES } from "./authorMap";
 import { TORAH_BOOKS, NEVIIM_BOOKS, KETUVIM_BOOKS } from "./tanakhBooks";
 import type { TanakhBook } from "./tanakhBooks";
 import { fromHebrewNumeral } from "./hebrewNumerals";
+import { RAMBAM_MAP } from "./rambamMap";
 
 export type DetectedRef =
   | {
@@ -29,6 +30,13 @@ export type DetectedRef =
       book: TanakhBook;
       chapter?: number;
       verse?: number;
+    }
+  | {
+      type: "rambam";
+      hilkhotHe: string;   // full key e.g. "הלכות בכורים"
+      sefRef: string;      // Sefaria ref base
+      chapter?: number;
+      halacha?: number;
     };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,6 +104,33 @@ const RE_HAL  = /ה['"""׳״]([א-ת])/g;
 // Yerushalmi marker
 const RE_YER  = /ירוש(?:למי)?['׳]?/;
 
+// ── Rambam regexes ────────────────────────────────────────────────────────────
+
+// Normalize common alternate spellings before matching
+const RAMBAM_SPELLING: [RegExp, string][] = [
+  [/ביכורים/g, "בכורים"],
+];
+
+function normalizeRambam(text: string): string {
+  let out = text;
+  for (const [from, to] of RAMBAM_SPELLING) out = out.replace(from, to);
+  return out;
+}
+
+// Build alternation from RAMBAM_MAP keys, longest first to avoid partial matches
+const RAMBAM_HILKHOT_ALT = Object.keys(RAMBAM_MAP)
+  .sort((a, b) => b.length - a.length)
+  .map(escapeRegex)
+  .join("|");
+
+// Optional author mention (רמב"ם / הרמב"ם) followed by optional ב + "הלכות section"
+const RE_RAMBAM = new RegExp(
+  `(?:ה?רמב['"""׳״]ם[\\s,]*)?ב?(${RAMBAM_HILKHOT_ALT})`
+);
+
+// Halacha: ה"א or "הלכה א"
+const RE_HAL_RAMBAM = /(?:ה['"""׳״]([א-ת])|הלכה\s+([א-ת]{1,3}[׳]?))/;
+
 // ── Sifri regexes ─────────────────────────────────────────────────────────────
 
 // Piska: number or Hebrew numeral
@@ -135,6 +170,21 @@ const RE_TANAKH_REF = new RegExp(
 
 export function detectSourceFromText(rawText: string): DetectedRef | null {
   const text = rawText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+  // ── 0. Rambam (checked first — "הלכות X" is unambiguous) ─────────────────
+  const normText = normalizeRambam(text);
+  const rambamM = RE_RAMBAM.exec(normText);
+  if (rambamM) {
+    const hilkhotHe = rambamM[1];
+    const sefRef = RAMBAM_MAP[hilkhotHe];
+    if (sefRef) {
+      const after = normText.slice(rambamM.index + rambamM[0].length);
+      const chapter = extractChapter(after) ?? undefined;
+      const halM = RE_HAL_RAMBAM.exec(after);
+      const halacha = halM ? (parseHebLetter(halM[1] ?? halM[2]) ?? undefined) : undefined;
+      return { type: "rambam", hilkhotHe, sefRef, chapter, halacha };
+    }
+  }
 
   // ── 1. ספרי ──────────────────────────────────────────────────────────────
   const sifriM = RE_SIFRI.exec(text);
