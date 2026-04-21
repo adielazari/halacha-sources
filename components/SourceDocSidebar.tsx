@@ -139,8 +139,10 @@ export default function SourceDocSidebar({
                     },
                     onDrop: (e) => {
                       e.preventDefault();
-                      const from = dragIndex.current;
-                      const to = dropTargetRef.current; // always fresh — avoids stale closure
+                      // Read from dataTransfer — survives dragend-before-drop on macOS/Chrome
+                      const fromStr = e.dataTransfer.getData("text/plain");
+                      const from = fromStr !== "" ? parseInt(fromStr, 10) : dragIndex.current;
+                      const to = dropTargetRef.current;
                       updateDropTarget(null);
                       dragIndex.current = null;
                       if (from !== null && to !== null && from !== to) {
