@@ -241,8 +241,10 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
 
       } else if (detected.type === "rambam") {
         setSourceType("rambam");
-        setRambamSection(detected.hilkhotHe);
-        setCurrentRambamSection(detected.hilkhotHe);
+        if (detected.hilkhotHe) {
+          setRambamSection(detected.hilkhotHe);
+          setCurrentRambamSection(detected.hilkhotHe);
+        }
         if (detected.chapter) setRambamChapterHe(heNum(detected.chapter));
         if (detected.halacha) setRambamHalachaHe(heNum(detected.halacha));
 

@@ -33,8 +33,8 @@ export type DetectedRef =
     }
   | {
       type: "rambam";
-      hilkhotHe: string;   // full key e.g. "הלכות בכורים"
-      sefRef: string;      // Sefaria ref base
+      hilkhotHe?: string;  // full key e.g. "הלכות בכורים" — absent for bare "הרמב"ם"
+      sefRef?: string;     // Sefaria ref base
       chapter?: number;
       halacha?: number;
     };
@@ -131,6 +131,9 @@ const RE_RAMBAM = new RegExp(
 // Halacha: ה"א or "הלכה א"
 const RE_HAL_RAMBAM = /(?:ה['"""׳״]([א-ת])|הלכה\s+([א-ת]{1,3}[׳]?))/;
 
+// Bare author mention: רמב"ם / הרמב"ם (with or without ה הידיעה)
+const RE_RAMBAM_BARE = /ה?רמב['"""׳״]ם/;
+
 // ── Sifri regexes ─────────────────────────────────────────────────────────────
 
 // Piska: number or Hebrew numeral
@@ -184,6 +187,10 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
       const halacha = halM ? (parseHebLetter(halM[1] ?? halM[2]) ?? undefined) : undefined;
       return { type: "rambam", hilkhotHe, sefRef, chapter, halacha };
     }
+  }
+  // Bare author mention — "הרמב"ם" / "רמב"ם" without a hilkhot section
+  if (RE_RAMBAM_BARE.test(normText)) {
+    return { type: "rambam" };
   }
 
   // ── 1. ספרי ──────────────────────────────────────────────────────────────
