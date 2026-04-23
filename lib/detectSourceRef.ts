@@ -70,6 +70,9 @@ function extractChapter(s: string): number | null {
   // Abbrev form: פ"ב / פ״ב / ספ"ב / בפ"ב / פ"ק
   const abbrev = s.match(/פ['"""׳״]([א-תק]+)/);
   if (abbrev) return parseHebLetter(abbrev[1]);
+  // ראש פרק: ר"פ ה' / ר׳פ ה׳
+  const rashPerek = s.match(/ר['"""׳״]פ\s+([א-תק]+[׳]?)/);
+  if (rashPerek) return parseHebLetter(rashPerek[1]);
   return null;
 }
 
@@ -109,6 +112,9 @@ const RE_YER  = /ירוש(?:למי)?['׳]?/;
 // Normalize common alternate spellings before matching
 const RAMBAM_SPELLING: [RegExp, string][] = [
   [/ביכורים/g, "בכורים"],
+  // מהל' / מהל״ / מהלכות → הלכות  (e.g. "מהל' בכורים" → "הלכות בכורים")
+  [/מהלכות\s+/g, "הלכות "],
+  [/מהל['"""׳״]\s*/g, "הלכות "],
 ];
 
 function normalizeRambam(text: string): string {
@@ -181,8 +187,10 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     const hilkhotHe = rambamM[1];
     const sefRef = RAMBAM_MAP[hilkhotHe];
     if (sefRef) {
-      const after = normText.slice(rambamM.index + rambamM[0].length);
-      const chapter = extractChapter(after) ?? undefined;
+      const before = normText.slice(0, rambamM.index);
+      const after  = normText.slice(rambamM.index + rambamM[0].length);
+      // chapter may appear before ("ר"פ ה' מהל' בכורים") or after ("הלכות בכורים פ"ה")
+      const chapter = extractChapter(after) ?? extractChapter(before) ?? undefined;
       const halM = RE_HAL_RAMBAM.exec(after);
       const halacha = halM ? (parseHebLetter(halM[1] ?? halM[2]) ?? undefined) : undefined;
       return { type: "rambam", hilkhotHe, sefRef, chapter, halacha };
