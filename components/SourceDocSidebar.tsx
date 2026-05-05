@@ -11,6 +11,8 @@ type SourceDocSidebarProps = {
   excerpts: Excerpt[];
   chelek: string;
   siman: string;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onRemove: (id: string) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddAnnotation: (afterId: string, type: DocItemType, text: string) => void;
@@ -24,6 +26,8 @@ export default function SourceDocSidebar({
   excerpts,
   chelek,
   siman,
+  collapsed = false,
+  onToggleCollapse,
   onRemove,
   onReorder,
   onAddAnnotation,
@@ -54,12 +58,41 @@ export default function SourceDocSidebar({
     setTopHeadingMode(false);
   }
 
+  if (collapsed) {
+    return (
+      <div className="w-8 flex-shrink-0 flex flex-col border-l border-gray-200 bg-gray-50 h-full items-center pt-2 gap-2">
+        <button
+          onClick={onToggleCollapse}
+          className="p-1 rounded hover:bg-gray-200 transition text-gray-500 hover:text-gray-800"
+          title="הצג דף מקורות"
+        >
+          ›
+        </button>
+        {excerpts.length > 0 && (
+          <span className="text-xs text-gray-400 writing-mode-vertical"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
+            {excerpts.length}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="w-72 flex-shrink-0 flex flex-col border-l border-gray-200 bg-gray-50 h-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-sm text-gray-700">דף מקורות</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onToggleCollapse}
+              className="p-0.5 rounded hover:bg-gray-100 transition text-gray-400 hover:text-gray-700 text-base leading-none"
+              title="הסתר דף מקורות"
+            >
+              ‹
+            </button>
+            <h2 className="font-bold text-sm text-gray-700">דף מקורות</h2>
+          </div>
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {excerpts.length}
           </span>

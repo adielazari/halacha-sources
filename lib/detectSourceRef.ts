@@ -8,6 +8,7 @@ import { TORAH_BOOKS, NEVIIM_BOOKS, KETUVIM_BOOKS } from "./tanakhBooks";
 import type { TanakhBook } from "./tanakhBooks";
 import { fromHebrewNumeral } from "./hebrewNumerals";
 import { RAMBAM_MAP } from "./rambamMap";
+import { TRACTATE_CHAPTERS, RAMBAM_CHAPTERS, TANAKH_CHAPTERS } from "./lastChapterMap";
 
 export type DetectedRef =
   | {
@@ -41,6 +42,9 @@ export type DetectedRef =
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// Internal sentinel: chapter/mishna/halacha position is "last" (בתרא) — resolved before returning.
+const BATRA = -1;
+
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -54,13 +58,15 @@ function parseHebLetter(s: string): number | null {
   return fromHebrewNumeral(clean);
 }
 
-/** Extract chapter number from abbreviated or word-form chapter string. */
+/** Extract chapter number from abbreviated or word-form chapter string.
+ *  Returns BATRA (-1) when the text says "last chapter" (בתרא / אחרון). */
 function extractChapter(s: string): number | null {
-  // Word form: "בפרק ב׳" / "פרק קמא" / "פרק ראשון"
+  // Word form: "בפרק ב׳" / "פרק קמא" / "פרק ראשון" / "פרק בתרא"
   const word = s.match(/פרק\s+([א-ת]+[׳]?)/);
   if (word) {
     const w = word[1].replace(/[׳]/g, "").trim();
     if (w === "קמא" || w === "ראשון") return 1;
+    if (w === "בתרא" || w === "אחרון") return BATRA;
     if (w === "שני") return 2;
     if (w === "שלישי") return 3;
     if (w === "רביעי") return 4;
@@ -81,9 +87,9 @@ function extractChapter(s: string): number | null {
 const tractateKeys = Object.keys(TRACTATE_MAP).sort((a, b) => b.length - a.length);
 const TRAC_ALT = tractateKeys.map(escapeRegex).join("|");
 
-// Chapter patterns (abbreviated and word-form, including פרק קמא)
+// Chapter patterns (abbreviated and word-form, including פרק קמא / פרק בתרא)
 const ABBREV_CH = `[בסרל]?פ['"""׳״][א-תק]+`;
-const WORD_CH   = `ב?פרק\\s+(?:[א-ת]+[׳]?|קמא)`;
+const WORD_CH   = `ב?פרק\\s+(?:[א-ת]+[׳]?|קמא|בתרא)`;
 const CHAPTER   = `(?:${ABBREV_CH}|${WORD_CH})`;
 
 const DAF = "[א-ת\\d]{1,3}";
@@ -91,14 +97,17 @@ const DAF = "[א-ת\\d]{1,3}";
 // Pattern A: Chapter + ד + tractate  (פ"ב דחלה / בפרק ב׳ דחלה / פרק קמא דקידושין)
 const RE_CH_TRAC = new RegExp(`(${CHAPTER})\\s*ד(${TRAC_ALT})`, "g");
 
-// Pattern B: Tractate + daf + amud  (ברכות כב. / קידושין נו:)
-const RE_TRAC_DAF = new RegExp(`(${TRAC_ALT})\\s+(${DAF})[.:]`, "g");
+// Pattern B: Tractate + optional "דף" + daf + amud  (ברכות כב. / מנחות דף ע.)
+const RE_TRAC_DAF = new RegExp(`(${TRAC_ALT})\\s+(?:דף\\s+)?(${DAF})[.:]`, "g");
 
 // Pattern C: Bare ד + tractate  (דחלה, דקידושין)
 const RE_D_TRAC = new RegExp(`ד(${TRAC_ALT})`, "g");
 
 // Pattern D: "מסכת <tractate>"
 const RE_MASECHET = new RegExp(`מסכת\\s*(${TRAC_ALT})`, "g");
+
+// Pattern E: "בריש <tractate>" — beginning = chapter 1 (optional "משנה" prefix forces mishna type)
+const RE_BERISH = new RegExp(`(משנה\\s+)?בריש(?:ה)?\\s+(${TRAC_ALT})`, "g");
 
 // Mishna abbreviation: מ"ג / מ׳ג
 const RE_MISH = /מ['"""׳״]([א-ת])/g;
@@ -171,7 +180,7 @@ const RE_PARSHA = new RegExp(`(?:פרשת|פ'|בפ')\\s*(${PARSHA_ALT})`, "g");
 // Verse: "chapter:verse" or "פרק X פסוק Y"
 // (?<![א-ת]) prevents matching book names that appear mid-word (e.g. "רות" inside "בכורות")
 const RE_TANAKH_REF = new RegExp(
-  `(?<![א-ת])(${TANAKH_ALT})\\s+(?:פרק\\s+)?([א-ת]{1,3}[׳״]?|\\d+)(?:[,:.][\\s]*([א-ת]{1,3}[׳״]?|\\d+))?`,
+  `(?<![א-ת])(${TANAKH_ALT})\\s+(?:פרק\\s+)?(בתרא|[א-ת]{1,3}[׳״]?|\\d+)(?:[,:.][\\s]*([א-ת]{1,3}[׳״]?|\\d+))?`,
   "g"
 );
 
@@ -190,9 +199,13 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
       const before = normText.slice(0, rambamM.index);
       const after  = normText.slice(rambamM.index + rambamM[0].length);
       // chapter may appear before ("ר"פ ה' מהל' בכורים") or after ("הלכות בכורים פ"ה")
-      const chapter = extractChapter(after) ?? extractChapter(before) ?? undefined;
+      const rawChapter = extractChapter(after) ?? extractChapter(before) ?? undefined;
+      const chapter = resolveBatra(rawChapter, () => RAMBAM_CHAPTERS[hilkhotHe]);
       const halM = RE_HAL_RAMBAM.exec(after);
-      const halacha = halM ? (parseHebLetter(halM[1] ?? halM[2]) ?? undefined) : undefined;
+      const rawHalacha = halM ? (parseHebLetter(halM[1] ?? halM[2]) ?? undefined) : undefined;
+      // סעיף/הלכה בתרא — resolve requires per-chapter data; leave undefined for now
+      const halachaBatra = /(?:הלכה|ה['"""׳״]|סעיף)\s*בתרא/.test(after);
+      const halacha = halachaBatra ? undefined : rawHalacha;
       return { type: "rambam", hilkhotHe, sefRef, chapter, halacha };
     }
   }
@@ -252,6 +265,10 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
   }
 
   function subNumbers(sub: string): { mishna?: number; halacha?: number } {
+    // Check for בתרא forms first (משנה/מ' בתרא, הלכה/ה'/סעיף בתרא)
+    if (/(?:משנה|מ['"""׳״])\s*בתרא/.test(sub)) return { mishna: BATRA };
+    if (/(?:הלכה|ה['"""׳״]|סעיף)\s*בתרא/.test(sub)) return { halacha: BATRA };
+
     RE_MISH.lastIndex = 0;
     const misM = RE_MISH.exec(sub);
     const mishna = misM ? (parseHebLetter(misM[1]) ?? undefined) : undefined;
@@ -261,6 +278,10 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     return { mishna, halacha };
   }
 
+  function resolveBatra(val: number | undefined, lastFn: () => number | undefined): number | undefined {
+    return val === BATRA ? lastFn() : val;
+  }
+
   // 3a. Chapter + ד + tractate
   RE_CH_TRAC.lastIndex = 0;
   const m1 = RE_CH_TRAC.exec(text);
@@ -268,7 +289,8 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     const tractateHe = m1[2];
     const tractateEn = TRACTATE_MAP[tractateHe];
     if (tractateEn) {
-      const chapter = extractChapter(m1[1]) ?? undefined;
+      const rawChapter = extractChapter(m1[1]) ?? undefined;
+      const chapter = resolveBatra(rawChapter, () => TRACTATE_CHAPTERS[tractateHe]);
       const after = text.slice(m1.index + m1[0].length);
       // Also detect daf in brackets: [כה.] [כה:] (כה.) etc. — e.g. "פ"ב דכתובות [כה.]"
       const bracketDafM = after.match(/[\[(]\s*([א-ת\d]{1,3})\s*([.:])[\])]?/);
@@ -279,7 +301,12 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
         daf = /^\d+$/.test(dafStr) ? parseInt(dafStr) : (fromHebrewNumeral(dafStr) ?? undefined);
         bracketAmud = bracketDafM[2] === "." ? "a" : "b";
       }
-      return { type: typeFor(tractateHe), tractateHe, tractateEn, chapter, daf, amud: bracketAmud, ...subNumbers(after) };
+      const sub = subNumbers(after);
+      return {
+        type: typeFor(tractateHe), tractateHe, tractateEn, chapter, daf, amud: bracketAmud,
+        mishna: resolveBatra(sub.mishna, () => undefined),
+        halacha: resolveBatra(sub.halacha, () => undefined),
+      };
     }
   }
 
@@ -309,8 +336,14 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
       const chRe = new RegExp(CHAPTER, "g");
       let lastCh: RegExpMatchArray | null = null, mc: RegExpMatchArray | null;
       while ((mc = chRe.exec(before)) !== null) lastCh = mc;
-      const chapter = lastCh ? (extractChapter(lastCh[0]) ?? undefined) : undefined;
-      return { type: typeFor(tractateHe), tractateHe, tractateEn, chapter, ...subNumbers(after) };
+      const rawChapter = lastCh ? (extractChapter(lastCh[0]) ?? undefined) : undefined;
+      const chapter = resolveBatra(rawChapter, () => TRACTATE_CHAPTERS[tractateHe]);
+      const sub = subNumbers(after);
+      return {
+        type: typeFor(tractateHe), tractateHe, tractateEn, chapter,
+        mishna: resolveBatra(sub.mishna, () => undefined),
+        halacha: resolveBatra(sub.halacha, () => undefined),
+      };
     }
   }
 
@@ -325,6 +358,20 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     }
   }
 
+  // 3e. "בריש <tractate>" — first chapter; "משנה בריש <tractate>" forces mishna
+  RE_BERISH.lastIndex = 0;
+  const m5 = RE_BERISH.exec(text);
+  if (m5) {
+    const hasMishnah = !!m5[1];
+    const tractateHe = m5[2];
+    const tractateEn = TRACTATE_MAP[tractateHe];
+    if (tractateEn) {
+      const isMishna = hasMishnah || MISHNAH_ONLY_TRACTATES.has(tractateHe);
+      const type = isYerushalmi ? "yerushalmi" : isMishna ? "mishna" : "gemara";
+      return { type, tractateHe, tractateEn, chapter: 1 };
+    }
+  }
+
   // ── 4. Tanakh book + chapter/verse ───────────────────────────────────────
   RE_TANAKH_REF.lastIndex = 0;
   const tanakhM = RE_TANAKH_REF.exec(text);
@@ -332,7 +379,8 @@ export function detectSourceFromText(rawText: string): DetectedRef | null {
     const bookHe = tanakhM[1];
     const book = TANAKH_SORTED.find((b) => b.he === bookHe);
     if (book) {
-      const chapter = parseHebLetter(tanakhM[2]) ?? undefined;
+      const rawChapter = tanakhM[2] === "בתרא" ? BATRA : (parseHebLetter(tanakhM[2]) ?? undefined);
+      const chapter = resolveBatra(rawChapter, () => TANAKH_CHAPTERS[bookHe]);
       const verse = tanakhM[3] ? (parseHebLetter(tanakhM[3]) ?? undefined) : undefined;
       return { type: "tanakh", book, chapter, verse };
     }

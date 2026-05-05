@@ -15,6 +15,7 @@ import { getSimanTopic } from "@/lib/simanTopics";
 import { HeadingToolbar } from "@/components/HeadingToolbar";
 import type { HeadingAlign } from "@/components/HeadingToolbar";
 import { useUser } from "@/lib/userContext";
+import GroupSimanBanner from "@/components/GroupSimanBanner";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -108,6 +109,7 @@ export default function SimanPage() {
   const [sourcePullContext, setSourcePullContext] = useState<SourcePullContext | null>(null);
   const [headingDialog, setHeadingDialog] = useState<HeadingDialogState>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setSession(chelek, number);
@@ -375,6 +377,8 @@ export default function SimanPage() {
         excerpts={excerpts}
         chelek={chelek}
         siman={number}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         onRemove={handleRemoveExcerpt}
         onEdit={handleEditExcerpt}
         onReorder={reorderExcerpts}
@@ -417,7 +421,9 @@ export default function SimanPage() {
               סימן {simanLabel}
             </button>
           </div>
-          <div className="w-20" />
+          <div className="w-20 flex justify-end">
+            <GroupSimanBanner chelek={chelek} simanNumber={parseInt(number, 10)} />
+          </div>
         </div>
 
         {/* Heading dialog — inline panel below header */}

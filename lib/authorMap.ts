@@ -86,6 +86,15 @@ export const TRACTATE_MAP: Record<string, string> = {
   'עוקצין': 'Oktzin',
   'מקואות': 'Mikvot',
   'אהלות': 'Oholot',
+  'עדיות': 'Eduyot',
+  'אבות': 'Avot',
+  'נגעים': 'Negaim',
+  'פרה': 'Parah',
+  'טהרות': 'Tahorot',
+  'כלים': 'Kelim',
+  'זבים': 'Zavim',
+  'ידים': 'Yadayim',
+  'טבול יום': 'Tevul_Yom',
 };
 
 // Tractates that exist only in Mishnah/Yerushalmi (no Bavli tractate)
@@ -93,6 +102,7 @@ export const TRACTATE_MAP: Record<string, string> = {
 export const MISHNAH_ONLY_TRACTATES = new Set([
   'ערלה', 'כלאים', 'שביעית', 'תרומות', 'מעשרות', 'מעשר שני', 'חלה',
   'בכורים', 'פאה', 'דמאי', 'תמיד', 'מדות', 'קינים', 'עוקצין', 'מקואות', 'אהלות',
+  'עדיות', 'אבות', 'נגעים', 'פרה', 'טהרות', 'כלים', 'זבים', 'ידים', 'טבול יום',
 ]);
 
 // Yerushalmi tractate → Sefaria Jerusalem_Talmud key

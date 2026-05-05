@@ -13,6 +13,7 @@ import { stripHtml, findSegmentRefs, parseTalmudRef, TRACTATE_HE } from "@/lib/r
 import { parseSourcesFromSeifim } from "@/lib/parser";
 import { detectSourceFromText } from "@/lib/detectSourceRef";
 import { toHebrewNumeral, fromHebrewNumeral } from "@/lib/hebrewNumerals";
+import { RISHON_MAP, RISHONIM_ENTRIES, AHARONIM_ENTRIES, buildRishonRef } from "@/lib/rishonimMap";
 import CommentatorSuggestions from "./CommentatorSuggestions";
 
 type Props = {
@@ -27,9 +28,9 @@ type Props = {
   }) => void;
 };
 
-type SourceType = "gemara" | "mishna" | "rambam" | "sifri" | "tanakh";
+type SourceType = "gemara" | "mishna" | "rambam" | "sifri" | "tanakh" | "rishon" | "aharon";
 type Amud = "א" | "ב" | "both";
-type NavMode = "" | "bavli_daf" | "yerushalmi" | "yerushalmi_daf" | "mishna" | "rambam" | "sifri" | "tanakh";
+type NavMode = "" | "bavli_daf" | "yerushalmi" | "yerushalmi_daf" | "mishna" | "rambam" | "sifri" | "tanakh" | "rishon_daf" | "rishon_chapter";
 type TanakhCategory = "torah" | "neviim" | "ketuvim";
 type Phase = "form" | "selecting" | "confirming" | "commenting" | "editing-commentary";
 type Segment = { ref: string; text: string };
@@ -140,6 +141,16 @@ function yerushalmiDafLabel(tractateEn: string, daf: number, a: Amud): string {
   return `ירוש' ${tractateHeName(tractateEn)} דף ${heNum(daf)}${amudSuffix(a)}`;
 }
 
+function rishonDafLabel(rishonHe: string, tractateEn: string, daf: number, a: Amud): string {
+  if (!rishonHe || !tractateEn || daf <= 0) return "";
+  return `${rishonHe} ${tractateHeName(tractateEn)} דף ${heNum(daf)}${amudSuffix(a)}`;
+}
+
+function rishonChapterLabel(rishonHe: string, tractateEn: string, ch: number): string {
+  if (!rishonHe || !tractateEn || ch <= 0) return "";
+  return `${rishonHe} ${tractateHeName(tractateEn)} פ"${heNum(ch)}`;
+}
+
 // ── Component ──
 
 export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
@@ -174,7 +185,13 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   const [tanakhBook, setTanakhBook] = useState<TanakhBook | null>(null);
   const [tanakhChapterHe, setTanakhChapterHe] = useState("");
   const [tanakhVerseHe, setTanakhVerseHe] = useState("");
+  // Rishon/Aharon fields
+  const [rishonKey, setRishonKey] = useState("");
+  const [rishonDafHe, setRishonDafHe] = useState("");
+  const [rishonAmud, setRishonAmud] = useState<Amud>("א");
+  const [rishonChapterHe, setRishonChapterHe] = useState("");
   // Current nav context extras
+  const [currentRishonKey, setCurrentRishonKey] = useState("");
   const [currentRambamSection, setCurrentRambamSection] = useState("");
   const [currentTanakhBook, setCurrentTanakhBook] = useState<TanakhBook | null>(null);
   const [currentSifriBook, setCurrentSifriBook] = useState<"Bamidbar" | "Devarim">("Bamidbar");
@@ -426,6 +443,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   // ── Current label ──
 
   function getCurrentLabel(): string {
+    const rishonHe = RISHON_MAP[currentRishonKey]?.hebrewName ?? "";
     switch (currentMode) {
       case "bavli_daf": return bavliDafLabel(currentTractateEn, currentDafNum, currentAmud);
       case "yerushalmi_daf": return yerushalmiDafLabel(currentTractateEn, currentDafNum, currentAmud);
@@ -434,6 +452,8 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       case "rambam": return rambamLabel(currentRambamSection, currentChapterNum, currentHalachaNum || undefined);
       case "sifri": return sifriLabel(currentSifriBook, currentChapterNum);
       case "tanakh": return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum || undefined);
+      case "rishon_daf": return rishonDafLabel(rishonHe, currentTractateEn, currentDafNum, currentAmud);
+      case "rishon_chapter": return rishonChapterLabel(rishonHe, currentTractateEn, currentChapterNum);
       default: return currentRef;
     }
   }
@@ -451,6 +471,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   }
 
   function getPrevLabel(): string {
+    const rishonHe = RISHON_MAP[currentRishonKey]?.hebrewName ?? "";
     switch (currentMode) {
       case "bavli_daf": {
         const { daf, a } = prevAmudDaf();
@@ -473,11 +494,17 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       case "tanakh":
         if (currentHalachaNum > 1) return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum - 1);
         return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum - 1);
+      case "rishon_daf": {
+        const { daf, a } = prevAmudDaf();
+        return rishonDafLabel(rishonHe, currentTractateEn, daf, a);
+      }
+      case "rishon_chapter": return rishonChapterLabel(rishonHe, currentTractateEn, currentChapterNum - 1);
       default: return chapterLabel(currentTractateEn, currentChapterNum - 1);
     }
   }
 
   function getNextLabel(): string {
+    const rishonHe = RISHON_MAP[currentRishonKey]?.hebrewName ?? "";
     switch (currentMode) {
       case "bavli_daf": {
         const { daf, a } = nextAmudDaf();
@@ -500,6 +527,11 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       case "tanakh":
         if (currentHalachaNum > 0) return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum + 1);
         return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum + 1);
+      case "rishon_daf": {
+        const { daf, a } = nextAmudDaf();
+        return rishonDafLabel(rishonHe, currentTractateEn, daf, a);
+      }
+      case "rishon_chapter": return rishonChapterLabel(rishonHe, currentTractateEn, currentChapterNum + 1);
       default: return chapterLabel(currentTractateEn, currentChapterNum + 1);
     }
   }
@@ -508,14 +540,16 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
     switch (currentMode) {
       case "bavli_daf":
       case "yerushalmi_daf":
-        if (currentAmud === "ב") return false; // can always go to same daf amud א
+      case "rishon_daf":
+        if (currentAmud === "ב") return false;
         if (currentAmud === "both") return currentDafNum <= 2;
-        return currentDafNum <= 2; // amud א, can't go before daf 2a
+        return currentDafNum <= 2;
       case "yerushalmi": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "rambam": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "mishna": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "sifri": return currentChapterNum <= 1;
       case "tanakh": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
+      case "rishon_chapter": return currentChapterNum <= 1;
       default: return currentChapterNum <= 1;
     }
   }
@@ -623,6 +657,26 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
           setCurrentChapterNum(newCh);
           setCurrentRef(primary);
         }
+      } else if (currentMode === "rishon_daf") {
+        if (currentAmud === "both") {
+          const newDaf = dir === "next" ? currentDafNum + 1 : currentDafNum - 1;
+          if (newDaf < 2) return;
+          const ref = buildRishonRef(currentRishonKey, currentTractateEn, newDaf, "a");
+          const { segs, primary } = await fetchRef(ref);
+          setSegments(segs); setCurrentDafNum(newDaf); setCurrentRef(primary);
+        } else {
+          const { daf, a } = dir === "next" ? nextAmudDaf() : prevAmudDaf();
+          if (daf < 2) return;
+          const ref = buildRishonRef(currentRishonKey, currentTractateEn, daf, a === "both" ? "a" : a === "א" ? "a" : "b");
+          const { segs, primary } = await fetchRef(ref);
+          setSegments(segs); setCurrentDafNum(daf); setCurrentAmud(a); setCurrentRef(primary);
+        }
+      } else if (currentMode === "rishon_chapter") {
+        const newCh = dir === "next" ? currentChapterNum + 1 : currentChapterNum - 1;
+        if (newCh < 1) return;
+        const ref = buildRishonRef(currentRishonKey, currentTractateEn, newCh);
+        const { segs, primary } = await fetchRef(ref);
+        setSegments(segs); setCurrentChapterNum(newCh); setCurrentRef(primary);
       }
       // Carry over any selections from this page as a new group (adjacent → no "..." separator)
       if (chunks.length > 0) {
@@ -632,7 +686,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       setPendingSelection("");
     } catch {/* silent */}
     finally { setLoadingDir(null); }
-  }, [chunks, currentMode, currentTractateEn, currentDafNum, currentAmud, currentChapterNum, currentHalachaNum, currentRambamSection, currentSifriBook, currentTanakhBook]);
+  }, [chunks, currentMode, currentTractateEn, currentDafNum, currentAmud, currentChapterNum, currentHalachaNum, currentRambamSection, currentSifriBook, currentTanakhBook, currentRishonKey]);
 
   // ── Pull helpers ──
 
@@ -732,6 +786,27 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         const d = await fetchRef(ref);
         setCurrentTanakhBook(tanakhBook);
         await applyPull(d, "tanakh", tanakhBook.en, ch, verse, 0, "both");
+      } else if (sourceType === "rishon" || sourceType === "aharon") {
+        const entry = RISHON_MAP[rishonKey];
+        if (!entry) { setFormError("יש לבחור ראשון/אחרון"); return; }
+        const tractateEn = TRACTATE_MAP[tractate] ?? "";
+        if (!tractate || !tractateEn) { setFormError("יש לבחור מסכת"); return; }
+        const refBase = entry.refTemplate.replace("{tractate}", tractateEn);
+        setCurrentRishonKey(rishonKey);
+        if (entry.navMode === "daf") {
+          const dafNum = parseNum(rishonDafHe);
+          if (!dafNum) { setFormError("יש למלא דף תקין"); return; }
+          const amudChar = rishonAmud === "א" ? "a" : rishonAmud === "ב" ? "b" : "a";
+          const ref = `${refBase}.${dafNum}${amudChar}`;
+          const d = await fetchRef(ref);
+          await applyPull(d, "rishon_daf", tractateEn, 0, 0, dafNum, rishonAmud);
+        } else {
+          const ch = parseNum(rishonChapterHe);
+          if (!ch) { setFormError("יש למלא פרק"); return; }
+          const ref = `${refBase}.${ch}`;
+          const d = await fetchRef(ref);
+          await applyPull(d, "rishon_chapter", tractateEn, ch, 0, 0, "both");
+        }
       }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "שגיאה בטעינה");
@@ -982,8 +1057,8 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       {phase === "form" && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4" dir="rtl">
           {/* Source type */}
-          <div className="flex gap-3 items-center flex-wrap">
-            {(["gemara", "mishna", "rambam", "sifri", "tanakh"] as SourceType[]).map((t) => (
+          <div className="flex gap-2 items-center flex-wrap">
+            {(["gemara", "mishna", "rambam", "sifri", "tanakh", "rishon", "aharon"] as SourceType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setSourceType(t)}
@@ -991,7 +1066,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
                   sourceType === t ? "bg-amber-600 text-white border-amber-600" : "border-gray-300 text-gray-600 hover:border-amber-400"
                 }`}
               >
-                {t === "gemara" ? "גמרא" : t === "mishna" ? "משנה" : t === "rambam" ? 'רמב"ם' : t === "sifri" ? "ספרי" : 'תנ"ך'}
+                {t === "gemara" ? "גמרא" : t === "mishna" ? "משנה" : t === "rambam" ? 'רמב"ם' : t === "sifri" ? "ספרי" : t === "tanakh" ? 'תנ"ך' : t === "rishon" ? "ראשונים" : "אחרונים"}
               </button>
             ))}
           </div>
@@ -1300,6 +1375,84 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Rishonim / Aharonim */}
+          {(sourceType === "rishon" || sourceType === "aharon") && (
+            <div className="space-y-3">
+              {/* Rishon/Aharon selector */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">{sourceType === "rishon" ? "ראשון" : "אחרון"}</label>
+                <select
+                  value={rishonKey}
+                  onChange={(e) => setRishonKey(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[220px]"
+                >
+                  <option value="">בחר...</option>
+                  {(sourceType === "rishon" ? RISHONIM_ENTRIES : AHARONIM_ENTRIES).map((r) => (
+                    <option key={r.key} value={r.key}>{r.hebrewName}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Tractate */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">מסכת</label>
+                <select
+                  value={tractate}
+                  onChange={(e) => setTractate(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[180px]"
+                >
+                  <option value="">בחר...</option>
+                  {TRACTATE_ENTRIES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {/* Daf or Chapter depending on rishon nav mode */}
+              {rishonKey && RISHON_MAP[rishonKey]?.navMode === "daf" && (
+                <div className="flex gap-3 items-end flex-wrap">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500">דף</label>
+                    <input
+                      type="text"
+                      value={rishonDafHe}
+                      onChange={(e) => setRishonDafHe(e.target.value)}
+                      placeholder="ב"
+                      className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      dir="rtl"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500">עמוד</label>
+                    <div className="flex border border-gray-300 rounded overflow-hidden text-sm">
+                      {(["עמ' א", "עמ' ב"] as const).map((lbl, i) => {
+                        const val: Amud = i === 0 ? "א" : "ב";
+                        return (
+                          <button
+                            key={lbl}
+                            onClick={() => setRishonAmud(val)}
+                            className={`px-2 py-1 transition ${rishonAmud === val ? "bg-amber-600 text-white" : "bg-white text-gray-600 hover:bg-amber-50"}`}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {rishonKey && RISHON_MAP[rishonKey]?.navMode === "chapter" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">פרק</label>
+                  <input
+                    type="text"
+                    value={rishonChapterHe}
+                    onChange={(e) => setRishonChapterHe(e.target.value)}
+                    placeholder="א"
+                    className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    dir="rtl"
+                  />
+                </div>
+              )}
             </div>
           )}
 
