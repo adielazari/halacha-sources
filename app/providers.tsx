@@ -1,7 +1,12 @@
 "use client";
 
-import { UserProvider } from "@/lib/userContext";
+import { SessionProvider } from "next-auth/react";
+import { FontSettingsProvider } from "@/lib/fontSettings";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <UserProvider>{children}</UserProvider>;
+  return (
+    <SessionProvider>
+      <FontSettingsProvider>{children}</FontSettingsProvider>
+    </SessionProvider>
+  );
 }

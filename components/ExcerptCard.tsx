@@ -21,8 +21,11 @@ type ExcerptCardProps = {
   onAddAnnotation: (type: DocItemType, text: string) => void;
   onAddHeading: (afterId: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
   onUpdateHeading: (id: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
+  onUpdateText: (id: string, text: string) => void;
   dragHandlers: DragHandlers;
 };
+
+const EDITABLE_TEXT_TYPES: DocItemType[] = ["explanation", "question", "answer"];
 
 const TYPE_STYLES: Record<string, { border: string; badge: string; label: string }> = {
   source:      { border: "", badge: "", label: "" },
@@ -30,6 +33,7 @@ const TYPE_STYLES: Record<string, { border: string; badge: string; label: string
   question:    { border: "3px solid #f59e0b", badge: "bg-amber-100 text-amber-800", label: "שאלה" },
   answer:      { border: "3px solid #14b8a6", badge: "bg-teal-100 text-teal-800", label: "תשובה" },
   heading:     { border: "3px solid #7c3aed", badge: "bg-purple-100 text-purple-800", label: "כותרת" },
+  image:       { border: "3px solid #ec4899", badge: "bg-pink-100 text-pink-800", label: "תמונה" },
 };
 
 
@@ -41,6 +45,7 @@ export default function ExcerptCard({
   onAddAnnotation,
   onAddHeading,
   onUpdateHeading,
+  onUpdateText,
   dragHandlers,
 }: ExcerptCardProps) {
   const itemType = excerpt.type ?? "source";
@@ -64,6 +69,10 @@ export default function ExcerptCard({
   const [editText, setEditText] = useState(excerpt.text);
   const [editAlign, setEditAlign] = useState<HeadingAlign>(excerpt.headingAlign ?? "right");
   const [editLevel, setEditLevel] = useState<1 | 2 | 3>(excerpt.headingLevel ?? 2);
+
+  // For editing this card if it's an explanation/question/answer
+  const [textEditMode, setTextEditMode] = useState(false);
+  const [textEditValue, setTextEditValue] = useState(excerpt.text);
 
   const borderStyle = itemType === "source"
     ? { borderRightWidth: "3px", borderRightColor: hex }
@@ -99,6 +108,17 @@ export default function ExcerptCard({
     setEditAlign(excerpt.headingAlign ?? "right");
     setEditLevel(excerpt.headingLevel ?? 2);
     setEditMode(true);
+  }
+
+  function openTextEdit() {
+    setTextEditValue(excerpt.text);
+    setTextEditMode(true);
+  }
+
+  function submitTextEdit() {
+    if (!textEditValue.trim()) return;
+    onUpdateText(excerpt.id, textEditValue.trim());
+    setTextEditMode(false);
   }
 
   return (
@@ -167,9 +187,43 @@ export default function ExcerptCard({
                   )}
                   <span className="text-xs text-gray-400 mr-auto">{index + 1}</span>
                 </div>
-                <p className="text-xs text-gray-700 leading-snug" dir="rtl">
-                  {preview}{truncated && "…"}
-                </p>
+                {EDITABLE_TEXT_TYPES.includes(itemType) && textEditMode ? (
+                  <div dir="rtl" onClick={(e) => e.stopPropagation()}>
+                    <textarea
+                      autoFocus
+                      value={textEditValue}
+                      onChange={(e) => setTextEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitTextEdit(); }
+                        if (e.key === "Escape") setTextEditMode(false);
+                      }}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none mb-1"
+                    />
+                    <div className="flex gap-1">
+                      <button onClick={submitTextEdit} className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700">שמור</button>
+                      <button onClick={() => setTextEditMode(false)} className="text-xs px-2 py-0.5 border border-gray-300 rounded hover:bg-gray-100">ביטול</button>
+                    </div>
+                  </div>
+                ) : itemType === "image" ? (
+                  excerpt.imageData && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={excerpt.imageData}
+                      alt={excerpt.sourceLabel}
+                      className="max-h-24 max-w-full rounded border border-gray-200 object-contain"
+                    />
+                  )
+                ) : (
+                  <p
+                    className={`text-xs text-gray-700 leading-snug ${EDITABLE_TEXT_TYPES.includes(itemType) ? "cursor-text" : ""}`}
+                    dir="rtl"
+                    onClick={EDITABLE_TEXT_TYPES.includes(itemType) ? openTextEdit : undefined}
+                    title={EDITABLE_TEXT_TYPES.includes(itemType) ? "לחץ לעריכה" : undefined}
+                  >
+                    {preview}{truncated && "…"}
+                  </p>
+                )}
               </>
             )}
           </div>

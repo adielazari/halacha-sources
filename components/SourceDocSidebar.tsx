@@ -6,6 +6,8 @@ import type { Excerpt, DocItemType } from "@/lib/types";
 import ExcerptCard from "./ExcerptCard";
 import { HeadingToolbar } from "./HeadingToolbar";
 import type { HeadingAlign } from "./HeadingToolbar";
+import AddManualSourceModal from "./AddManualSourceModal";
+import type { ManualEntryPayload } from "./AddManualSourceModal";
 
 type SourceDocSidebarProps = {
   excerpts: Excerpt[];
@@ -18,6 +20,8 @@ type SourceDocSidebarProps = {
   onAddAnnotation: (afterId: string, type: DocItemType, text: string) => void;
   onAddHeading: (afterId: string | null, text: string, align: HeadingAlign, level?: 1 | 2 | 3) => void;
   onUpdateHeading: (id: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
+  onUpdateText: (id: string, text: string) => void;
+  onAddManual: (payload: ManualEntryPayload) => void;
   onEdit: (excerptId: string) => void;
   onReset: () => void;
 };
@@ -33,12 +37,15 @@ export default function SourceDocSidebar({
   onAddAnnotation,
   onAddHeading,
   onUpdateHeading,
+  onUpdateText,
+  onAddManual,
   onEdit,
   onReset,
 }: SourceDocSidebarProps) {
   const dragIndex = useRef<number | null>(null);
   const dropTargetRef = useRef<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
 
   const updateDropTarget = useCallback((val: number | null) => {
     dropTargetRef.current = val;
@@ -96,6 +103,15 @@ export default function SourceDocSidebar({
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {excerpts.length}
           </span>
+        </div>
+        {/* Manual source button */}
+        <div className="mt-2">
+          <button
+            onClick={() => setManualModalOpen(true)}
+            className="w-full text-xs text-amber-700 border border-amber-200 rounded py-1 hover:bg-amber-50 transition"
+          >
+            + הוסף מקור ידנית
+          </button>
         </div>
         {/* Top-level heading button */}
         <div className="mt-2">
@@ -157,6 +173,7 @@ export default function SourceDocSidebar({
                   onAddAnnotation={(type, text) => onAddAnnotation(ex.id, type, text)}
                   onAddHeading={(afterId, text, align, level) => onAddHeading(afterId, text, align, level)}
                   onUpdateHeading={(id, text, align, level) => onUpdateHeading(id, text, align, level)}
+                  onUpdateText={(id, text) => onUpdateText(id, text)}
                   dragHandlers={{
                     onDragStart: (e) => {
                       dragIndex.current = idx;
@@ -222,6 +239,13 @@ export default function SourceDocSidebar({
           </p>
         )}
       </div>
+
+      {manualModalOpen && (
+        <AddManualSourceModal
+          onAdd={onAddManual}
+          onClose={() => setManualModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

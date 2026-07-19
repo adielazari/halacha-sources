@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "./store";
 import type { CommentaryEntry, Annotation } from "@/lib/types";
@@ -16,6 +16,8 @@ import { HeadingToolbar } from "@/components/HeadingToolbar";
 import type { HeadingAlign } from "@/components/HeadingToolbar";
 import { useUser } from "@/lib/userContext";
 import GroupSimanBanner from "@/components/GroupSimanBanner";
+import { useDocumentAutosave } from "./useDocumentAutosave";
+import type { ManualEntryPayload } from "@/components/AddManualSourceModal";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -95,6 +97,7 @@ export default function SimanPage() {
     addAnnotation,
     addHeading,
     updateHeading,
+    updateExcerptText,
     togglePanel,
     setSession,
     setExcerptAnnotationId,
@@ -114,6 +117,8 @@ export default function SimanPage() {
   useEffect(() => {
     setSession(chelek, number);
   }, [chelek, number, setSession]);
+
+  const saveState = useDocumentAutosave(chelek, number);
 
   useEffect(() => {
     fetch(`/api/annotations?chelek=${chelek}&siman=${number}&status=all`)
@@ -148,17 +153,130 @@ export default function SimanPage() {
       sourceLabel: string;
       note?: string;
     }) => {
-      // Direct "הוסף לדף" — adds to the user's document only, no panel highlight annotation.
+      // Direct "הוסף לדף" — adds to the doc AND creates a linked annotation so the
+      // panel highlights the exact place the source was taken from.
+      const excerptId = crypto.randomUUID();
       addExcerpt({
+        id: excerptId,
         sourceKey: params.sourceKey,
         sourceLabel: params.sourceLabel,
         text: params.text,
         sectionIndex: params.sectionIndex,
         note: params.note,
       });
+      fetch("/api/annotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chelek,
+          siman: number,
+          sourceKey: params.sourceKey,
+          sourceLabel: params.sourceLabel,
+          text: params.text,
+          highlightText: params.text,
+          sectionIndex: params.sectionIndex ?? null,
+          userName: currentUser,
+        }),
+      })
+        .then((r) => r.json())
+        .then((data: { annotation?: Annotation }) => {
+          if (data.annotation) {
+            setAnnotations((prev) => [...prev, data.annotation!]);
+            setExcerptAnnotationId(excerptId, data.annotation.id);
+          }
+        })
+        .catch(() => {});
+    },
+    [addExcerpt, chelek, number, currentUser, setExcerptAnnotationId]
+  );
+
+  const handleAddManual = useCallback(
+    (payload: ManualEntryPayload) => {
+      if (payload.kind === "text") {
+        addExcerpt({
+          type: "source",
+          sourceKey: "manual",
+          sourceLabel: payload.sourceLabel,
+          text: payload.text,
+        });
+      } else {
+        addExcerpt({
+          type: "image",
+          sourceKey: "manual",
+          sourceLabel: payload.sourceLabel,
+          text: "",
+          imageData: payload.imageData,
+        });
+      }
     },
     [addExcerpt]
   );
+
+  // Backfill: excerpts added before this linking existed (or added while an
+  // earlier POST silently failed) have no annotationId — create one now so the
+  // panel highlights their origin too. Guarded so each excerpt is only tried once.
+  const backfilledIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const toBackfill = excerpts.filter(
+      (ex) =>
+        (ex.type ?? "source") === "source" &&
+        !ex.annotationId &&
+        ex.sourceKey &&
+        ex.sourceKey !== "heading" &&
+        !backfilledIds.current.has(ex.id)
+    );
+    if (toBackfill.length === 0) return;
+    toBackfill.forEach((ex) => backfilledIds.current.add(ex.id));
+
+    (async () => {
+      for (const ex of toBackfill) {
+        const highlightText = ex.text.replace(/<[^>]+>/g, "").trim();
+        if (!highlightText) continue;
+        try {
+          const res = await fetch("/api/annotations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chelek,
+              siman: number,
+              sourceKey: ex.sourceKey,
+              sourceLabel: ex.sourceLabel,
+              text: ex.text,
+              highlightText,
+              sectionIndex: ex.sectionIndex ?? null,
+              userName: currentUser,
+            }),
+          });
+          const data: { annotation?: Annotation } = await res.json();
+          if (data.annotation) {
+            setAnnotations((prev) => [...prev, data.annotation!]);
+            setExcerptAnnotationId(ex.id, data.annotation.id);
+          }
+        } catch { /* silent — will retry next mount */ }
+      }
+    })();
+  }, [excerpts, chelek, number, currentUser, setExcerptAnnotationId]);
+
+  // Repair: excerpts pulled via "הגדר מקור" never had sectionIndex copied onto
+  // the excerpt itself (only the linked annotation had it) — so the document's
+  // origin-section grouping/heading couldn't work. Backfill it from the annotation.
+  const sectionFixedIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (annotations.length === 0) return;
+    const toFix = excerpts.filter((ex) => {
+      if (sectionFixedIds.current.has(ex.id)) return false;
+      if (ex.sectionIndex !== undefined) return false;
+      if (!ex.annotationId) return false;
+      const ann = annotations.find((a) => a.id === ex.annotationId);
+      return ann?.sectionIndex !== null && ann?.sectionIndex !== undefined;
+    });
+    if (toFix.length === 0) return;
+    toFix.forEach((ex) => {
+      sectionFixedIds.current.add(ex.id);
+      const ann = annotations.find((a) => a.id === ex.annotationId)!;
+      updateExcerptFields(ex.id, { sectionIndex: ann.sectionIndex! });
+    });
+  }, [excerpts, annotations, updateExcerptFields]);
 
   // Remove excerpt + delete its panel highlight annotation (if any)
   const handleRemoveExcerpt = useCallback(
@@ -224,6 +342,7 @@ export default function SimanPage() {
           sourceLabel: params.sourceLabel,
           sourceRef: params.sourceRef,
           commentaries: params.commentaries,
+          sectionIndex: panelSectionIndex ?? undefined,
         });
         // Also PATCH the linked annotation if there is one
         if (existingAnnotation) {
@@ -260,6 +379,7 @@ export default function SimanPage() {
             text: params.text,
             sourceRef: params.sourceRef,
             commentaries: params.commentaries,
+            sectionIndex: panelSectionIndex ?? undefined,
           });
           setExcerptAnnotationId(newId, existingAnnotation.id);
         }
@@ -296,6 +416,7 @@ export default function SimanPage() {
           text: params.text,
           sourceRef: params.sourceRef,
           commentaries: params.commentaries,
+          sectionIndex: panelSectionIndex ?? undefined,
         });
         fetch("/api/annotations", {
           method: "POST",
@@ -385,6 +506,8 @@ export default function SimanPage() {
         onAddAnnotation={addAnnotation}
         onAddHeading={addHeading}
         onUpdateHeading={updateHeading}
+        onUpdateText={updateExcerptText}
+        onAddManual={handleAddManual}
         onReset={reset}
       />
 
@@ -421,7 +544,10 @@ export default function SimanPage() {
               סימן {simanLabel}
             </button>
           </div>
-          <div className="w-20 flex justify-end">
+          <div className="w-20 flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-400">
+              {saveState === "saving" ? "שומר..." : saveState === "saved" ? "נשמר" : ""}
+            </span>
             <GroupSimanBanner chelek={chelek} simanNumber={parseInt(number, 10)} />
           </div>
         </div>

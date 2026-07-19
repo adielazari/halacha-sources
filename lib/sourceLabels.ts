@@ -40,3 +40,32 @@ export function buildSourceLabel(sourceKey: string, sectionIndex?: number): stri
     default:                return base;
   }
 }
+
+/** Full (non-abbreviated) source names — used for the document's grouped-section headings. */
+const FULL_SOURCE_NAMES: Record<string, string> = {
+  tur: "טור",
+  beitYosef: "בית יוסף",
+  shulchanArukh: "שולחן ערוך",
+  taz: 'ט"ז',
+  shakh: 'ש"ך',
+  pitcheiTeshuva: "פתחי תשובה",
+};
+
+/**
+ * Heading shown in the document/export when 2+ excerpts were pulled from the
+ * same panel section, e.g. "בית יוסף אות ה'" — groups them under one origin label.
+ */
+export function buildGroupHeading(sourceKey: string, sectionIndex?: number): string {
+  const base = FULL_SOURCE_NAMES[sourceKey] ?? SOURCE_LABELS[sourceKey] ?? sourceKey;
+  if (sectionIndex === undefined) return base;
+  const num = toHebrewNumeral(sectionIndex + 1);
+  switch (sourceKey) {
+    case "shulchanArukh":   return `${base} סעיף ${num}`;
+    case "taz":
+    case "shakh":           return `${base} ס"ק ${num}`;
+    case "pitcheiTeshuva":
+    case "beitYosef":
+    case "tur":             return `${base} אות ${num}`;
+    default:                return base;
+  }
+}

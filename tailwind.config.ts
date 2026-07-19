@@ -11,6 +11,20 @@ const config: Config = {
       fontFamily: {
         hebrew: ["Noto Serif Hebrew", "serif"],
       },
+      colors: {
+        leket: {
+          navy:      "#1b3358",
+          navyDark:  "#122540",
+          gold:      "#c9962a",
+          goldLight: "#e8b84b",
+          cream:     "#faf8f3",
+          parchment: "#f0e8d4",
+          border:    "#ddd0b0",
+          text:      "#2c2416",
+          muted:     "#8a7f6e",
+          card:      "#ffffff",
+        },
+      },
     },
   },
   plugins: [],

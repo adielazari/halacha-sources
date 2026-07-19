@@ -30,9 +30,10 @@ type Store = {
   addHeading(afterId: string | null, text: string, align: "right" | "center" | "left", level?: 1 | 2 | 3): void;
   updateHeading(id: string, text: string, align: "right" | "center" | "left", level: 1 | 2 | 3): void;
   updateExcerptText(id: string, text: string): void;
-  updateExcerptFields(id: string, fields: Partial<Pick<Excerpt, "text" | "sourceLabel" | "sourceRef" | "commentaries">>): void;
+  updateExcerptFields(id: string, fields: Partial<Pick<Excerpt, "text" | "sourceLabel" | "sourceRef" | "commentaries" | "sectionIndex">>): void;
   togglePanel(key: string): void;
   setSession(chelek: string, siman: string): void;
+  loadDocument(excerpts: Excerpt[], expandedPanels: Record<string, boolean>): void;
   reset(): void;
 };
 
@@ -157,6 +158,9 @@ export const useStore = create<Store>()(
             expandedPanels: { shulchanArukh: true },
           };
         }),
+
+      loadDocument: (excerpts, expandedPanels) =>
+        set({ excerpts, expandedPanels }),
 
       reset: () =>
         set({

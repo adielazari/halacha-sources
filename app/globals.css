@@ -1,26 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@300;400;500;700&family=Heebo:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: "Noto Serif Hebrew", serif;
+  font-family: var(--app-font-family, "Noto Serif Hebrew", serif);
+  font-size: var(--app-font-size, 16px);
+  line-height: var(--app-line-height, 1.8);
   direction: rtl;
+  background-color: #faf8f3;
+  color: #2c2416;
 }
 
 @layer base {
   :root {
-    --background: #fdf6e3;
-    --foreground: #333;
+    --navy:      #1b3358;
+    --navy-dark: #122540;
+    --gold:      #c9962a;
+    --cream:     #faf8f3;
+    --parchment: #f0e8d4;
+    --border:    #ddd0b0;
+    --text:      #2c2416;
+    --muted:     #8a7f6e;
+  }
+}
+
+@layer components {
+  .leket-card {
+    @apply bg-white rounded-2xl border border-leket-border shadow-sm;
+  }
+
+  .leket-input {
+    @apply w-full border border-leket-border rounded-xl px-4 py-2.5 text-right
+           bg-leket-cream text-leket-text placeholder-leket-muted
+           focus:outline-none focus:ring-2 focus:ring-leket-gold focus:border-leket-gold
+           transition text-base;
+  }
+
+  .leket-btn-primary {
+    @apply bg-leket-navy hover:bg-leket-navyDark text-white font-semibold
+           py-2.5 px-6 rounded-xl transition-all duration-200 text-base;
+  }
+
+  .gold-rule {
+    @apply border-none h-px bg-gradient-to-l from-transparent via-leket-gold to-transparent;
   }
 }
 
 @media print {
-  .no-print {
-    display: none !important;
-  }
-  body {
-    background: white;
-  }
+  .no-print { display: none !important; }
+  body { background: white; }
+  aside { display: none !important; }
+  .print\:break-after-page { break-after: page; }
 }

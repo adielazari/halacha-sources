@@ -15,6 +15,8 @@ import { detectSourceFromText } from "@/lib/detectSourceRef";
 import { toHebrewNumeral, fromHebrewNumeral } from "@/lib/hebrewNumerals";
 import { RISHON_MAP, RISHONIM_ENTRIES, AHARONIM_ENTRIES, buildRishonRef } from "@/lib/rishonimMap";
 import CommentatorSuggestions from "./CommentatorSuggestions";
+import { MIDRASH_FAMILIES, midrashHasUnit2, midrashRef, midrashLabel } from "@/lib/midrashMap";
+import type { MidrashFamilyId } from "@/lib/midrashMap";
 
 type Props = {
   context: SourcePullContext;
@@ -28,9 +30,9 @@ type Props = {
   }) => void;
 };
 
-type SourceType = "gemara" | "mishna" | "rambam" | "sifri" | "tanakh" | "rishon" | "aharon";
+type SourceType = "gemara" | "mishna" | "rambam" | "midrash" | "tanakh" | "rishon" | "aharon";
 type Amud = "א" | "ב" | "both";
-type NavMode = "" | "bavli_daf" | "yerushalmi" | "yerushalmi_daf" | "mishna" | "rambam" | "sifri" | "tanakh" | "rishon_daf" | "rishon_chapter";
+type NavMode = "" | "bavli_daf" | "yerushalmi" | "yerushalmi_daf" | "mishna" | "rambam" | "sifri" | "midrash" | "tanakh" | "rishon_daf" | "rishon_chapter";
 type TanakhCategory = "torah" | "neviim" | "ketuvim";
 type Phase = "form" | "selecting" | "confirming" | "commenting" | "editing-commentary";
 type Segment = { ref: string; text: string };
@@ -180,6 +182,14 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   const [sifriBook, setSifriBook] = useState<"Bamidbar" | "Devarim">("Bamidbar");
   const [sifriParasha, setSifriParasha] = useState("");
   const [sifriPiskaHe, setSifriPiskaHe] = useState("");
+  // Midrash (generic families) fields
+  const [midrashFamily, setMidrashFamily] = useState<MidrashFamilyId>("sifrei");
+  const [midrashBookKey, setMidrashBookKey] = useState("");
+  const [midrashUnit1He, setMidrashUnit1He] = useState("");
+  const [midrashUnit2He, setMidrashUnit2He] = useState("");
+  const [midrashFreeRef, setMidrashFreeRef] = useState("");
+  const [currentMidrashFamily, setCurrentMidrashFamily] = useState<Exclude<MidrashFamilyId, "freeref">>("sifrei");
+  const [currentMidrashBookKey, setCurrentMidrashBookKey] = useState("");
   // Tanakh fields
   const [tanakhCategory, setTanakhCategory] = useState<TanakhCategory>("torah");
   const [tanakhBook, setTanakhBook] = useState<TanakhBook | null>(null);
@@ -242,7 +252,8 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
     const detected = detectSourceFromText(context.text);
     if (detected) {
       if (detected.type === "sifri") {
-        setSourceType("sifri");
+        setSourceType("midrash");
+        setMidrashFamily("sifrei");
         setSifriBook(detected.sifriBook);
         if (detected.piska) setSifriPiskaHe(heNum(detected.piska));
 
@@ -451,6 +462,10 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       case "mishna": return mishnaLabel(currentTractateEn, currentChapterNum, currentHalachaNum || undefined);
       case "rambam": return rambamLabel(currentRambamSection, currentChapterNum, currentHalachaNum || undefined);
       case "sifri": return sifriLabel(currentSifriBook, currentChapterNum);
+      case "midrash": {
+        const fam = MIDRASH_FAMILIES[currentMidrashFamily];
+        return midrashLabel(fam.label, fam.scheme, currentMidrashBookKey, currentChapterNum, currentHalachaNum || undefined);
+      }
       case "tanakh": return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum || undefined);
       case "rishon_daf": return rishonDafLabel(rishonHe, currentTractateEn, currentDafNum, currentAmud);
       case "rishon_chapter": return rishonChapterLabel(rishonHe, currentTractateEn, currentChapterNum);
@@ -491,6 +506,12 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         if (currentHalachaNum > 1) return mishnaLabel(currentTractateEn, currentChapterNum, currentHalachaNum - 1);
         return mishnaLabel(currentTractateEn, currentChapterNum - 1);
       case "sifri": return sifriLabel(currentSifriBook, currentChapterNum - 1);
+      case "midrash": {
+        const fam = MIDRASH_FAMILIES[currentMidrashFamily];
+        if (midrashHasUnit2(fam) && currentHalachaNum > 1)
+          return midrashLabel(fam.label, fam.scheme, currentMidrashBookKey, currentChapterNum, currentHalachaNum - 1);
+        return midrashLabel(fam.label, fam.scheme, currentMidrashBookKey, currentChapterNum - 1);
+      }
       case "tanakh":
         if (currentHalachaNum > 1) return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum - 1);
         return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum - 1);
@@ -524,6 +545,12 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         if (currentHalachaNum > 0) return mishnaLabel(currentTractateEn, currentChapterNum, currentHalachaNum + 1);
         return mishnaLabel(currentTractateEn, currentChapterNum + 1);
       case "sifri": return sifriLabel(currentSifriBook, currentChapterNum + 1);
+      case "midrash": {
+        const fam = MIDRASH_FAMILIES[currentMidrashFamily];
+        if (midrashHasUnit2(fam) && currentHalachaNum > 0)
+          return midrashLabel(fam.label, fam.scheme, currentMidrashBookKey, currentChapterNum, currentHalachaNum + 1);
+        return midrashLabel(fam.label, fam.scheme, currentMidrashBookKey, currentChapterNum + 1);
+      }
       case "tanakh":
         if (currentHalachaNum > 0) return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum, currentHalachaNum + 1);
         return tanakhLabel(currentTanakhBook?.he ?? "", currentChapterNum + 1);
@@ -548,6 +575,10 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       case "rambam": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "mishna": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "sifri": return currentChapterNum <= 1;
+      case "midrash": {
+        const fam = MIDRASH_FAMILIES[currentMidrashFamily];
+        return midrashHasUnit2(fam) ? (currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1) : currentChapterNum <= 1;
+      }
       case "tanakh": return currentHalachaNum > 0 ? currentHalachaNum <= 1 : currentChapterNum <= 1;
       case "rishon_chapter": return currentChapterNum <= 1;
       default: return currentChapterNum <= 1;
@@ -641,6 +672,25 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         setSegments(segs);
         setCurrentChapterNum(newCh);
         setCurrentRef(primary);
+      } else if (currentMode === "midrash") {
+        const fam = MIDRASH_FAMILIES[currentMidrashFamily];
+        const hasUnit2 = midrashHasUnit2(fam);
+        let newCh = currentChapterNum;
+        let newUnit2 = currentHalachaNum;
+        if (hasUnit2 && currentHalachaNum > 0) {
+          newUnit2 = dir === "next" ? currentHalachaNum + 1 : currentHalachaNum - 1;
+          if (newUnit2 < 1) return;
+        } else {
+          newCh = dir === "next" ? currentChapterNum + 1 : currentChapterNum - 1;
+          if (newCh < 1) return;
+          newUnit2 = 0;
+        }
+        const ref = midrashRef(fam.scheme, currentMidrashBookKey, newCh, newUnit2 || undefined);
+        const { segs, primary } = await fetchRef(ref);
+        setSegments(segs);
+        setCurrentChapterNum(newCh);
+        setCurrentHalachaNum(newUnit2);
+        setCurrentRef(primary);
       } else if (currentMode === "tanakh" && currentTanakhBook) {
         if (currentHalachaNum > 0) {
           const newVerse = dir === "next" ? currentHalachaNum + 1 : currentHalachaNum - 1;
@@ -686,7 +736,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       setPendingSelection("");
     } catch {/* silent */}
     finally { setLoadingDir(null); }
-  }, [chunks, currentMode, currentTractateEn, currentDafNum, currentAmud, currentChapterNum, currentHalachaNum, currentRambamSection, currentSifriBook, currentTanakhBook, currentRishonKey]);
+  }, [chunks, currentMode, currentTractateEn, currentDafNum, currentAmud, currentChapterNum, currentHalachaNum, currentRambamSection, currentSifriBook, currentMidrashFamily, currentMidrashBookKey, currentTanakhBook, currentRishonKey]);
 
   // ── Pull helpers ──
 
@@ -719,7 +769,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   async function handlePull() {
     setFormError("");
     const tractateEn = TRACTATE_MAP[tractate] ?? "";
-    if (sourceType !== "rambam" && sourceType !== "sifri" && sourceType !== "tanakh" && (!tractate || !tractateEn)) {
+    if (sourceType !== "rambam" && sourceType !== "midrash" && sourceType !== "tanakh" && (!tractate || !tractateEn)) {
       setFormError("יש לבחור מסכת");
       return;
     }
@@ -769,13 +819,34 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         const d = await fetchRef(ref);
         setCurrentRambamSection(rambamSection);
         await applyPull(d, "rambam", refBase, ch, hal, 0, "both");
-      } else if (sourceType === "sifri") {
+      } else if (sourceType === "midrash" && midrashFamily === "sifrei") {
         const piska = parseNum(sifriPiskaHe);
         if (!piska) { setFormError("יש למלא פסקא"); return; }
         const ref = `Sifrei_${sifriBook}.${piska}`;
         const d = await fetchRef(ref);
         setCurrentSifriBook(sifriBook);
         await applyPull(d, "sifri", `Sifrei_${sifriBook}`, piska, 0, 0, "both");
+      } else if (sourceType === "midrash" && midrashFamily === "freeref") {
+        const ref = midrashFreeRef.trim();
+        if (!ref) { setFormError("יש להזין ref בספריא"); return; }
+        const d = await fetchRef(ref);
+        await applyPull(d, "", ref, 0, 0, 0, "both");
+      } else if (sourceType === "midrash") {
+        const familyId = midrashFamily as Exclude<MidrashFamilyId, "freeref">;
+        const fam = MIDRASH_FAMILIES[familyId];
+        const needsBook = fam.scheme.kind !== "flat" || fam.scheme.books.length > 1;
+        const bookKey = needsBook ? midrashBookKey : fam.scheme.kind === "flat" ? fam.scheme.books[0].key : "";
+        if (needsBook && !bookKey) { setFormError("יש לבחור"); return; }
+        const unit1 = parseNum(midrashUnit1He);
+        if (!unit1) { setFormError(`יש למלא ${fam.scheme.unit1Label}`); return; }
+        const unit2Label = "unit2Label" in fam.scheme ? fam.scheme.unit2Label : undefined;
+        const unit2 = midrashUnit2He.trim() ? parseNum(midrashUnit2He) : 0;
+        if (midrashUnit2He.trim() && !unit2) { setFormError(`${unit2Label ?? "פסקא"} לא תקין`); return; }
+        const ref = midrashRef(fam.scheme, bookKey, unit1, unit2 || undefined);
+        const d = await fetchRef(ref);
+        setCurrentMidrashFamily(familyId);
+        setCurrentMidrashBookKey(bookKey);
+        await applyPull(d, "midrash", ref, unit1, unit2, 0, "both");
       } else if (sourceType === "tanakh") {
         if (!tanakhBook) { setFormError("יש לבחור ספר"); return; }
         const ch = parseNum(tanakhChapterHe);
@@ -1058,7 +1129,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4" dir="rtl">
           {/* Source type */}
           <div className="flex gap-2 items-center flex-wrap">
-            {(["gemara", "mishna", "rambam", "sifri", "tanakh", "rishon", "aharon"] as SourceType[]).map((t) => (
+            {(["gemara", "mishna", "rambam", "midrash", "tanakh", "rishon", "aharon"] as SourceType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setSourceType(t)}
@@ -1066,7 +1137,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
                   sourceType === t ? "bg-amber-600 text-white border-amber-600" : "border-gray-300 text-gray-600 hover:border-amber-400"
                 }`}
               >
-                {t === "gemara" ? "גמרא" : t === "mishna" ? "משנה" : t === "rambam" ? 'רמב"ם' : t === "sifri" ? "ספרי" : t === "tanakh" ? 'תנ"ך' : t === "rishon" ? "ראשונים" : "אחרונים"}
+                {t === "gemara" ? "גמרא" : t === "mishna" ? "משנה" : t === "rambam" ? 'רמב"ם' : t === "midrash" ? "מדרשים" : t === "tanakh" ? 'תנ"ך' : t === "rishon" ? "ראשונים" : "אחרונים"}
               </button>
             ))}
           </div>
@@ -1273,45 +1344,122 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
             </div>
           )}
 
-          {/* Sifri: book toggle + parasha dropdown + piska */}
-          {sourceType === "sifri" && (
+          {/* Midrash: family selector, then per-family fields */}
+          {sourceType === "midrash" && (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                {(["Bamidbar", "Devarim"] as const).map((b) => (
-                  <button key={b} onClick={() => { setSifriBook(b); setSifriParasha(""); setSifriPiskaHe(""); }}
-                    className={`text-xs px-3 py-1 rounded-full border transition ${sifriBook === b ? "bg-amber-600 text-white border-amber-600" : "border-gray-300 text-gray-600 hover:border-amber-400"}`}>
-                    {b === "Bamidbar" ? "במדבר" : "דברים"}
+              <div className="flex gap-2 flex-wrap">
+                {([...Object.values(MIDRASH_FAMILIES).map((f) => f.id), "freeref"] as MidrashFamilyId[]).map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => { setMidrashFamily(id); setMidrashBookKey(""); setMidrashUnit1He(""); setMidrashUnit2He(""); }}
+                    className={`text-xs px-3 py-1 rounded-full border transition ${
+                      midrashFamily === id ? "bg-amber-600 text-white border-amber-600" : "border-gray-300 text-gray-600 hover:border-amber-400"
+                    }`}
+                  >
+                    {id === "freeref" ? "ref חופשי" : MIDRASH_FAMILIES[id].label}
                   </button>
                 ))}
               </div>
-              <div className="flex gap-3 items-end flex-wrap">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500">פרשה (רשות)</label>
-                  <select
-                    value={sifriParasha}
-                    onChange={(e) => {
-                      const name = e.target.value;
-                      setSifriParasha(name);
-                      if (name) {
-                        const list = sifriBook === "Bamidbar" ? SIFRI_BAMIDBAR_PARSHIYOT : SIFRI_DEVARIM_PARSHIYOT;
-                        const p = list.find((x) => x.name === name);
-                        if (p) setSifriPiskaHe(heNum(p.firstPiska));
-                      }
-                    }}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[140px]"
-                  >
-                    <option value="">בחר...</option>
-                    {(sifriBook === "Bamidbar" ? SIFRI_BAMIDBAR_PARSHIYOT : SIFRI_DEVARIM_PARSHIYOT).map((p) => (
-                      <option key={p.name} value={p.name}>{p.name}</option>
+
+              {/* ספרי — unchanged dedicated form (book toggle + parasha dropdown + piska) */}
+              {midrashFamily === "sifrei" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    {(["Bamidbar", "Devarim"] as const).map((b) => (
+                      <button key={b} onClick={() => { setSifriBook(b); setSifriParasha(""); setSifriPiskaHe(""); }}
+                        className={`text-xs px-3 py-1 rounded-full border transition ${sifriBook === b ? "bg-amber-600 text-white border-amber-600" : "border-gray-300 text-gray-600 hover:border-amber-400"}`}>
+                        {b === "Bamidbar" ? "במדבר" : "דברים"}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  <div className="flex gap-3 items-end flex-wrap">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">פרשה (רשות)</label>
+                      <select
+                        value={sifriParasha}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          setSifriParasha(name);
+                          if (name) {
+                            const list = sifriBook === "Bamidbar" ? SIFRI_BAMIDBAR_PARSHIYOT : SIFRI_DEVARIM_PARSHIYOT;
+                            const p = list.find((x) => x.name === name);
+                            if (p) setSifriPiskaHe(heNum(p.firstPiska));
+                          }
+                        }}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[140px]"
+                      >
+                        <option value="">בחר...</option>
+                        {(sifriBook === "Bamidbar" ? SIFRI_BAMIDBAR_PARSHIYOT : SIFRI_DEVARIM_PARSHIYOT).map((p) => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">פסקא</label>
+                      <input type="text" value={sifriPiskaHe} onChange={(e) => setSifriPiskaHe(e.target.value)}
+                        placeholder="א" className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400" dir="rtl" />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500">פסקא</label>
-                  <input type="text" value={sifriPiskaHe} onChange={(e) => setSifriPiskaHe(e.target.value)}
-                    placeholder="א" className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400" dir="rtl" />
+              )}
+
+              {/* ref חופשי — free Sefaria ref, any text (covers ספרא and anything else not modeled above) */}
+              {midrashFamily === "freeref" && (
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">ref בספריא</label>
+                  <input
+                    type="text"
+                    value={midrashFreeRef}
+                    onChange={(e) => setMidrashFreeRef(e.target.value)}
+                    placeholder="Sifra,_Vayikra_Dibbura_DeNedavah.1.1"
+                    dir="ltr"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-left focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  />
                 </div>
-              </div>
+              )}
+
+              {/* מדרש רבה / תנחומא / מכילתא / ילקוט שמעוני — generic scheme-driven form */}
+              {midrashFamily !== "sifrei" && midrashFamily !== "freeref" && (() => {
+                const fam = MIDRASH_FAMILIES[midrashFamily];
+                const scheme = fam.scheme;
+                const options =
+                  scheme.kind === "flat" ? (scheme.books.length > 1 ? scheme.books : null)
+                  : scheme.kind === "parasha" ? scheme.parshiyot
+                  : scheme.tractates;
+                const selectorLabel =
+                  scheme.kind === "flat" ? "ספר" : scheme.kind === "parasha" ? "פרשה" : "מסכתא";
+                return (
+                  <div className="space-y-3">
+                    {options && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-500">{selectorLabel}</label>
+                        <select
+                          value={midrashBookKey}
+                          onChange={(e) => setMidrashBookKey(e.target.value)}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[220px]"
+                        >
+                          <option value="">בחר...</option>
+                          {options.map((o) => <option key={o.key} value={o.key}>{o.he}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex gap-3 items-end flex-wrap">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-500">{scheme.unit1Label}</label>
+                        <input type="text" value={midrashUnit1He} onChange={(e) => setMidrashUnit1He(e.target.value)}
+                          placeholder="א" className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400" dir="rtl" />
+                      </div>
+                      {"unit2Label" in scheme && scheme.unit2Label && (
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-gray-500">{scheme.unit2Label} (רשות)</label>
+                          <input type="text" value={midrashUnit2He} onChange={(e) => setMidrashUnit2He(e.target.value)}
+                            placeholder="א" className="border border-gray-300 rounded px-2 py-1 text-sm w-16 focus:outline-none focus:ring-1 focus:ring-amber-400" dir="rtl" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

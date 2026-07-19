@@ -20,6 +20,8 @@ cache/sefaria/
 
 # Database
 data/*.db
+data/*.db-shm
+data/*.db-wal
 
 # Misc
 .DS_Store
@@ -28,3 +30,4 @@ npm-debug.log*
 
 # Worktrees
 .worktrees/
+scripts/siman-headings.json
