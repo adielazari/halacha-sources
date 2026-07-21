@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { Annotation } from "@/lib/types";
 import { highlightAnnotations } from "@/lib/highlightAnnotations";
 
@@ -20,6 +21,8 @@ interface TextPanelProps {
   annotations?: Annotation[];
   currentUser?: string;
   onSectionClick?: (sourceKey: string, sectionIndex: number, label: string) => void;
+  heightPx?: number;
+  onHeightChange?: (px: number) => void;
 }
 
 export default function TextPanel({
@@ -33,7 +36,33 @@ export default function TextPanel({
   annotations,
   currentUser,
   onSectionClick,
+  heightPx,
+  onHeightChange,
 }: TextPanelProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Feed the native CSS resize-handle drag back into the persisted preference.
+  // Read offsetHeight (border-box, matches the `style.height` we set below
+  // under Tailwind's global border-box reset) rather than the ResizeObserver
+  // entry's contentRect (content-box only, excludes padding — using it here
+  // would silently shrink the persisted height by the padding amount every
+  // time the panel re-renders). Skip the observer's initial on-observe firing
+  // so merely expanding a panel doesn't immediately re-persist its height.
+  useEffect(() => {
+    if (!expanded || !onHeightChange) return;
+    const el = contentRef.current;
+    if (!el) return;
+    let isFirst = true;
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const observer = new ResizeObserver(() => {
+      if (isFirst) { isFirst = false; return; }
+      const newHeight = Math.round(el.offsetHeight);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => onHeightChange(newHeight), 300);
+    });
+    observer.observe(el);
+    return () => { clearTimeout(debounceTimer); observer.disconnect(); };
+  }, [expanded, onHeightChange]);
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
       <button
@@ -52,7 +81,11 @@ export default function TextPanel({
       </button>
 
       {expanded && (
-        <div className="p-4 bg-white max-h-[55vh] overflow-y-auto">
+        <div
+          ref={contentRef}
+          className="p-4 bg-white overflow-y-auto resize-y min-h-[120px]"
+          style={{ height: heightPx, maxHeight: "80vh" }}
+        >
           {html !== undefined ? (
             <div
               data-source-key={sourceKey}

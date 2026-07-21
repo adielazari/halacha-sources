@@ -23,6 +23,7 @@ type SourceDocSidebarProps = {
   onUpdateText: (id: string, text: string) => void;
   onAddManual: (payload: ManualEntryPayload) => void;
   onEdit: (excerptId: string) => void;
+  onViewOrigin: (excerptId: string) => void;
   onReset: () => void;
 };
 
@@ -40,6 +41,7 @@ export default function SourceDocSidebar({
   onUpdateText,
   onAddManual,
   onEdit,
+  onViewOrigin,
   onReset,
 }: SourceDocSidebarProps) {
   const dragIndex = useRef<number | null>(null);
@@ -170,6 +172,7 @@ export default function SourceDocSidebar({
                   index={idx}
                   onRemove={() => onRemove(ex.id)}
                   onEdit={() => onEdit(ex.id)}
+                  onViewOrigin={() => onViewOrigin(ex.id)}
                   onAddAnnotation={(type, text) => onAddAnnotation(ex.id, type, text)}
                   onAddHeading={(afterId, text, align, level) => onAddHeading(afterId, text, align, level)}
                   onUpdateHeading={(id, text, align, level) => onUpdateHeading(id, text, align, level)}

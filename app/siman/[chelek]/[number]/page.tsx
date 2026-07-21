@@ -18,6 +18,8 @@ import { useUser } from "@/lib/userContext";
 import GroupSimanBanner from "@/components/GroupSimanBanner";
 import { useDocumentAutosave } from "./useDocumentAutosave";
 import type { ManualEntryPayload } from "@/components/AddManualSourceModal";
+import SourceViewModal from "@/components/SourceViewModal";
+import { usePanelPrefs, DEFAULT_PANEL_HEIGHT } from "@/lib/panelPrefs";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -64,6 +66,14 @@ type HeadingDialogState = {
   level: 1 | 2 | 3;
 } | null;
 
+type ViewModalState = {
+  title: string;
+  html: string;
+  commentaries?: CommentaryEntry[];
+  note?: string;
+  onEdit?: () => void;
+} | null;
+
 function decodeHtml(html: string): string {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
@@ -105,6 +115,14 @@ export default function SimanPage() {
     reset,
   } = useStore();
   const { currentUser } = useUser();
+  const panelPrefs = usePanelPrefs();
+  const panelDragKey = useRef<string | null>(null);
+  const panelDropTargetRef = useRef<number | null>(null);
+  const [panelDropTarget, setPanelDropTarget] = useState<number | null>(null);
+  const updatePanelDropTarget = useCallback((val: number | null) => {
+    panelDropTargetRef.current = val;
+    setPanelDropTarget(val);
+  }, []);
 
   const [texts, setTexts] = useState<TextsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +131,7 @@ export default function SimanPage() {
   const [headingDialog, setHeadingDialog] = useState<HeadingDialogState>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [viewModal, setViewModal] = useState<ViewModalState>(null);
 
   useEffect(() => {
     setSession(chelek, number);
@@ -312,6 +331,23 @@ export default function SimanPage() {
     [excerpts, annotations]
   );
 
+  // Sidebar "view" — show the excerpt exactly as it was pulled into the
+  // document (its own text + commentaries), in a read-only popup.
+  const handleViewOrigin = useCallback(
+    (excerptId: string) => {
+      const excerpt = excerpts.find((e) => e.id === excerptId);
+      if (!excerpt) return;
+      setViewModal({
+        title: excerpt.sourceLabel,
+        html: excerpt.text,
+        commentaries: excerpt.commentaries,
+        note: excerpt.note,
+        onEdit: () => { setViewModal(null); handleEditExcerpt(excerptId); },
+      });
+    },
+    [excerpts, handleEditExcerpt]
+  );
+
   const handleDefineSource = useCallback(
     (selectedText: string, sourceKey: string, sectionIndex?: number, sectionHtml?: string) => {
       const sectionLabel = sectionIndex !== undefined
@@ -451,7 +487,9 @@ export default function SimanPage() {
     [addExcerpt, updateExcerptFields, setExcerptAnnotationId, excerpts, chelek, number, currentUser, sourcePullContext]
   );
 
-  // Click on a highlighted <mark> → open SourcePullView with annotation pre-loaded
+  // Click on a highlighted <mark> → open a read-only view popup showing the
+  // source as it was actually pulled into the document (edit is one more
+  // deliberate click away, via the popup's "ערוך מקור" button).
   const handleMarkClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -461,15 +499,25 @@ export default function SimanPage() {
       if (!annId) return;
       const ann = annotations.find((a) => a.id === annId);
       if (!ann) return;
-      setSourcePullContext({
-        text: ann.highlightText ?? "",
-        sourceKey: ann.sourceKey,
-        sectionIndex: ann.sectionIndex ?? undefined,
-        sectionHtml: ann.sectionHtml ?? undefined,
-        annotation: ann,
+      const linkedExcerpt = excerpts.find((ex) => ex.annotationId === annId);
+      setViewModal({
+        title: linkedExcerpt?.sourceLabel ?? ann.sourceLabel,
+        html: linkedExcerpt?.text ?? ann.text ?? ann.highlightText ?? "",
+        commentaries: linkedExcerpt?.commentaries ?? ann.commentaries,
+        note: linkedExcerpt?.note,
+        onEdit: () => {
+          setViewModal(null);
+          setSourcePullContext({
+            text: ann.highlightText ?? "",
+            sourceKey: ann.sourceKey,
+            sectionIndex: ann.sectionIndex ?? undefined,
+            sectionHtml: ann.sectionHtml ?? undefined,
+            annotation: ann,
+          });
+        },
       });
     },
-    [annotations]
+    [annotations, excerpts]
   );
 
   // Section label clicked in SA panel → open heading dialog
@@ -502,6 +550,7 @@ export default function SimanPage() {
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         onRemove={handleRemoveExcerpt}
         onEdit={handleEditExcerpt}
+        onViewOrigin={handleViewOrigin}
         onReorder={reorderExcerpts}
         onAddAnnotation={addAnnotation}
         onAddHeading={addHeading}
@@ -616,16 +665,20 @@ export default function SimanPage() {
                 </button>
               </div>
             )}
-            {texts && !loading && (
-              <div>
-                {SOURCE_ORDER.map(({ key, title }) => {
-                  const hex = getHex(key);
-                  const expanded = expandedPanels[key] === true;
+            {texts && !loading && (() => {
+              const orderedPanels = panelPrefs.order
+                .map((key) => SOURCE_ORDER.find((s) => s.key === key))
+                .filter((s): s is (typeof SOURCE_ORDER)[number] => !!s);
 
-                  if (key === "tur") {
-                    return (
+              return (
+                <div>
+                  {orderedPanels.map(({ key, title }, idx) => {
+                    const hex = getHex(key);
+                    const expanded = expandedPanels[key] === true;
+                    const heightPx = panelPrefs.heights[key] ?? DEFAULT_PANEL_HEIGHT;
+
+                    const panelNode = key === "tur" ? (
                       <TextPanel
-                        key={key}
                         title={title}
                         hexColor={hex}
                         sourceKey={key}
@@ -634,30 +687,73 @@ export default function SimanPage() {
                         html={texts.tur?.text ?? ""}
                         annotations={annotations.filter((a) => a.sourceKey === key)}
                         currentUser={currentUser}
+                        heightPx={heightPx}
+                        onHeightChange={(px) => panelPrefs.setHeight(key, px)}
                       />
+                    ) : (() => {
+                      const data = (texts as Record<string, { ref: string; text: string[] } | null>)[key];
+                      const sections = data ? buildSections(key, data.text) : undefined;
+                      return (
+                        <TextPanel
+                          title={title}
+                          hexColor={hex}
+                          sourceKey={key}
+                          expanded={expanded}
+                          onToggle={() => togglePanel(key)}
+                          sections={sections}
+                          annotations={annotations.filter((a) => a.sourceKey === key)}
+                          currentUser={currentUser}
+                          onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
+                          heightPx={heightPx}
+                          onHeightChange={(px) => panelPrefs.setHeight(key, px)}
+                        />
+                      );
+                    })();
+
+                    return (
+                      <div
+                        key={key}
+                        draggable
+                        onDragStart={(e) => {
+                          panelDragKey.current = key;
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", key);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          const mid = rect.top + rect.height / 2;
+                          updatePanelDropTarget(e.clientY < mid ? idx : idx + 1);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const fromKey = e.dataTransfer.getData("text/plain") || panelDragKey.current;
+                          const to = panelDropTargetRef.current;
+                          updatePanelDropTarget(null);
+                          panelDragKey.current = null;
+                          if (fromKey && to !== null) {
+                            const fromIdx = orderedPanels.findIndex((p) => p.key === fromKey);
+                            const insertAt = to > fromIdx ? to - 1 : to;
+                            if (fromIdx !== insertAt) panelPrefs.reorder(fromKey, insertAt);
+                          }
+                        }}
+                        onDragEnd={() => { updatePanelDropTarget(null); panelDragKey.current = null; }}
+                        className="cursor-grab active:cursor-grabbing"
+                      >
+                        {panelDropTarget === idx && panelDragKey.current !== key && (
+                          <div className="h-0.5 bg-blue-500 rounded-full mb-1 shadow-sm" />
+                        )}
+                        {panelNode}
+                        {idx === orderedPanels.length - 1 && panelDropTarget === orderedPanels.length && (
+                          <div className="h-0.5 bg-blue-500 rounded-full mt-1 shadow-sm" />
+                        )}
+                      </div>
                     );
-                  }
-
-                  const data = (texts as Record<string, { ref: string; text: string[] } | null>)[key];
-                  const sections = data ? buildSections(key, data.text) : undefined;
-
-                  return (
-                    <TextPanel
-                      key={key}
-                      title={title}
-                      hexColor={hex}
-                      sourceKey={key}
-                      expanded={expanded}
-                      onToggle={() => togglePanel(key)}
-                      sections={sections}
-                      annotations={annotations.filter((a) => a.sourceKey === key)}
-                      currentUser={currentUser}
-                      onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
-                    />
-                  );
-                })}
-              </div>
-            )}
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -681,6 +777,17 @@ export default function SimanPage() {
           onAdd={handleAdd}
           onDefineSource={handleDefineSource}
           texts={texts}
+        />
+      )}
+
+      {viewModal && (
+        <SourceViewModal
+          title={viewModal.title}
+          html={viewModal.html}
+          commentaries={viewModal.commentaries}
+          note={viewModal.note}
+          onEdit={viewModal.onEdit}
+          onClose={() => setViewModal(null)}
         />
       )}
     </div>

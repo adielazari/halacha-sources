@@ -7,6 +7,7 @@ import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import type { Excerpt } from "@/lib/types";
 import { downloadExport } from "@/lib/downloadExport";
 import { groupExcerpts } from "@/lib/groupExcerpts";
+import SourceViewModal from "@/components/SourceViewModal";
 
 type AgentSummary = { id: string; name: string };
 
@@ -17,7 +18,7 @@ const CHELEK_LABELS: Record<string, string> = {
   ChoshenMishpat: "חושן משפט",
 };
 
-function ExcerptItem({ ex, num, nested }: { ex: Excerpt; num: number; nested?: boolean }) {
+function ExcerptItem({ ex, num, nested, onView }: { ex: Excerpt; num: number; nested?: boolean; onView?: (ex: Excerpt) => void }) {
   const itemType = ex.type ?? "source";
 
   if (itemType === "heading") {
@@ -91,7 +92,10 @@ function ExcerptItem({ ex, num, nested }: { ex: Excerpt; num: number; nested?: b
 
   // source (default)
   return (
-    <div className={nested ? "border-b border-dashed border-amber-200 pb-4 last:border-0 last:pb-0" : "border-b border-gray-100 pb-6 last:border-0"}>
+    <div
+      className={`${nested ? "border-b border-dashed border-amber-200 pb-4 last:border-0 last:pb-0" : "border-b border-gray-100 pb-6 last:border-0"} ${onView ? "cursor-pointer hover:bg-amber-50/40 rounded transition -mx-2 px-2" : ""}`}
+      onClick={onView ? () => onView(ex) : undefined}
+    >
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-bold text-gray-400">{num}.</span>
         <span className="text-sm font-bold text-gray-800">{ex.sourceLabel}</span>
@@ -133,6 +137,7 @@ export default function DocumentPage() {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
   const [runError, setRunError] = useState("");
+  const [viewingExcerpt, setViewingExcerpt] = useState<Excerpt | null>(null);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -343,14 +348,14 @@ export default function DocumentPage() {
                 if (block.kind === "single") {
                   const isSource = (block.item.type ?? "source") === "source";
                   if (isSource) counter++;
-                  return <ExcerptItem key={block.item.id} ex={block.item} num={counter} />;
+                  return <ExcerptItem key={block.item.id} ex={block.item} num={counter} onView={isSource ? setViewingExcerpt : undefined} />;
                 }
                 return (
                   <div key={block.items[0].id} className="border border-amber-200 bg-amber-50/50 rounded-lg p-4 space-y-4">
                     <p className="text-sm font-bold text-amber-800">{block.heading}</p>
                     {block.items.map((ex) => {
                       counter++;
-                      return <ExcerptItem key={ex.id} ex={ex} num={counter} nested />;
+                      return <ExcerptItem key={ex.id} ex={ex} num={counter} nested onView={setViewingExcerpt} />;
                     })}
                   </div>
                 );
@@ -359,6 +364,16 @@ export default function DocumentPage() {
           </div>
         )}
       </div>
+
+      {viewingExcerpt && (
+        <SourceViewModal
+          title={viewingExcerpt.sourceLabel}
+          html={viewingExcerpt.text}
+          commentaries={viewingExcerpt.commentaries}
+          note={viewingExcerpt.note}
+          onClose={() => setViewingExcerpt(null)}
+        />
+      )}
     </div>
   );
 }

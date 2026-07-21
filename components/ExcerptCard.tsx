@@ -18,6 +18,7 @@ type ExcerptCardProps = {
   index: number;
   onRemove: () => void;
   onEdit: () => void;
+  onViewOrigin: () => void;
   onAddAnnotation: (type: DocItemType, text: string) => void;
   onAddHeading: (afterId: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
   onUpdateHeading: (id: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
@@ -42,6 +43,7 @@ export default function ExcerptCard({
   index,
   onRemove,
   onEdit,
+  onViewOrigin,
   onAddAnnotation,
   onAddHeading,
   onUpdateHeading,
@@ -181,7 +183,12 @@ export default function ExcerptCard({
                     </span>
                   )}
                   {itemType === "source" && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: hex }}>
+                    <span
+                      onClick={onViewOrigin}
+                      className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0 cursor-pointer hover:brightness-110 transition"
+                      style={{ backgroundColor: hex }}
+                      title="הצג מקור"
+                    >
                       {excerpt.sourceLabel}
                     </span>
                   )}
@@ -216,10 +223,22 @@ export default function ExcerptCard({
                   )
                 ) : (
                   <p
-                    className={`text-xs text-gray-700 leading-snug ${EDITABLE_TEXT_TYPES.includes(itemType) ? "cursor-text" : ""}`}
+                    className={`text-xs text-gray-700 leading-snug ${EDITABLE_TEXT_TYPES.includes(itemType) ? "cursor-text" : ""} ${itemType === "source" ? "cursor-pointer hover:text-amber-700" : ""}`}
                     dir="rtl"
-                    onClick={EDITABLE_TEXT_TYPES.includes(itemType) ? openTextEdit : undefined}
-                    title={EDITABLE_TEXT_TYPES.includes(itemType) ? "לחץ לעריכה" : undefined}
+                    onClick={
+                      EDITABLE_TEXT_TYPES.includes(itemType)
+                        ? openTextEdit
+                        : itemType === "source"
+                        ? onViewOrigin
+                        : undefined
+                    }
+                    title={
+                      EDITABLE_TEXT_TYPES.includes(itemType)
+                        ? "לחץ לעריכה"
+                        : itemType === "source"
+                        ? "הצג מקור"
+                        : undefined
+                    }
                   >
                     {preview}{truncated && "…"}
                   </p>
