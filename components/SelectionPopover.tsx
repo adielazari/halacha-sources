@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { buildSourceLabel } from "@/lib/sourceLabels";
 
-const COMMENTATOR_KEYS = new Set(["beitYosef", "taz", "shakh", "pitcheiTeshuva"]);
+const COMMENTATOR_KEYS = new Set([
+  "beitYosef", "taz", "shakh", "pitcheiTeshuva",
+  "magenAvraham", "beitShmuel", "meiratEinayim",
+]);
 
 type SelectionInfo = {
   sourceKey: string;
@@ -29,6 +32,9 @@ type TextsData = {
   taz: { ref: string; text: string[] } | null;
   shakh: { ref: string; text: string[] } | null;
   pitcheiTeshuva: { ref: string; text: string[] } | null;
+  magenAvraham: { ref: string; text: string[] } | null;
+  beitShmuel: { ref: string; text: string[] } | null;
+  meiratEinayim: { ref: string; text: string[] } | null;
 } | null;
 
 type SelectionPopoverProps = {

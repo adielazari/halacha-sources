@@ -35,7 +35,20 @@ const SOURCE_ORDER = [
   { key: "taz",           title: 'ט"ז' },
   { key: "shakh",         title: 'ש"ך' },
   { key: "pitcheiTeshuva",title: "פתחי תשובה" },
+  { key: "magenAvraham",  title: 'מג"א' },
+  { key: "beitShmuel",    title: 'ב"ש' },
+  { key: "meiratEinayim", title: 'סמ"ע' },
 ] as const;
+
+// Which side-commentators actually exist for each chelek — e.g. Shakh never
+// wrote on Orach Chayim, so that panel used to render permanently empty
+// there. Panels not listed for the current chelek are hidden entirely.
+const CHELEK_PANEL_KEYS: Record<string, string[]> = {
+  OrachChayim:    ["tur", "beitYosef", "shulchanArukh", "magenAvraham", "taz"],
+  YorehDeah:      ["tur", "beitYosef", "shulchanArukh", "taz", "shakh", "pitcheiTeshuva"],
+  EvenHaEzer:     ["tur", "beitYosef", "shulchanArukh", "taz", "beitShmuel", "pitcheiTeshuva"],
+  ChoshenMishpat: ["tur", "beitYosef", "shulchanArukh", "meiratEinayim", "shakh", "pitcheiTeshuva"],
+};
 
 type TextsData = {
   tur: { ref: string; text: string } | null;
@@ -44,6 +57,9 @@ type TextsData = {
   taz: { ref: string; text: string[] } | null;
   shakh: { ref: string; text: string[] } | null;
   pitcheiTeshuva: { ref: string; text: string[] } | null;
+  magenAvraham: { ref: string; text: string[] } | null;
+  beitShmuel: { ref: string; text: string[] } | null;
+  meiratEinayim: { ref: string; text: string[] } | null;
 };
 
 export type SourcePullContext = {
@@ -666,7 +682,9 @@ export default function SimanPage() {
               </div>
             )}
             {texts && !loading && (() => {
+              const relevantKeys = CHELEK_PANEL_KEYS[chelek] ?? SOURCE_ORDER.map((s) => s.key);
               const orderedPanels = panelPrefs.order
+                .filter((key) => relevantKeys.includes(key))
                 .map((key) => SOURCE_ORDER.find((s) => s.key === key))
                 .filter((s): s is (typeof SOURCE_ORDER)[number] => !!s);
 

@@ -57,6 +57,28 @@ const MEFARESH_CHELEK_MAP: Record<string, Record<string, string | null>> = {
     EvenHaEzer: "Pitchei_Teshuva_on_Shulchan_Arukh%2C_Even_HaEzer",
     ChoshenMishpat: "Pitchei_Teshuva_on_Shulchan_Arukh%2C_Choshen_Mishpat",
   },
+  // The actual commentaries printed beside the Shulchan Arukh text differ per
+  // chelek — Shakh never covered Orach Chayim (hence it always came back
+  // empty there), and Even HaEzer / Choshen Mishpat each pair Taz/Shakh with
+  // a different second commentator than Yoreh Deah does.
+  "magen-avraham": {
+    OrachChayim: "Magen_Avraham",
+    YorehDeah: null,
+    EvenHaEzer: null,
+    ChoshenMishpat: null,
+  },
+  "beit-shmuel": {
+    OrachChayim: null,
+    YorehDeah: null,
+    EvenHaEzer: "Beit_Shmuel",
+    ChoshenMishpat: null,
+  },
+  "meirat-einayim": {
+    OrachChayim: null,
+    YorehDeah: null,
+    EvenHaEzer: null,
+    ChoshenMishpat: "Me%27irat_Einayim_on_Shulchan_Arukh%2C_Choshen_Mishpat",
+  },
 };
 
 export type SeifimText = {

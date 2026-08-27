@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "leket-panel-prefs";
-const DEFAULT_ORDER = ["tur", "beitYosef", "shulchanArukh", "taz", "shakh", "pitcheiTeshuva"];
+const DEFAULT_ORDER = [
+  "tur", "beitYosef", "shulchanArukh",
+  "taz", "shakh", "pitcheiTeshuva",
+  "magenAvraham", "beitShmuel", "meiratEinayim",
+];
 // Roughly matches the old hardcoded 55vh on a typical viewport — keeps the
 // first-load behavior unchanged for anyone who hasn't customized anything.
 export const DEFAULT_PANEL_HEIGHT = 420;

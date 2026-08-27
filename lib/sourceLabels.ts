@@ -7,6 +7,9 @@ export const SOURCE_LABELS: Record<string, string> = {
   taz: 'ט"ז',
   shakh: 'ש"ך',
   pitcheiTeshuva: 'פת"ש',
+  magenAvraham: 'מג"א',
+  beitShmuel: 'ב"ש',
+  meiratEinayim: 'סמ"ע',
 };
 
 export const SOURCE_COLORS: Record<string, { hex: string }> = {
@@ -16,6 +19,9 @@ export const SOURCE_COLORS: Record<string, { hex: string }> = {
   taz:           { hex: "#0d9488" },
   shakh:         { hex: "#4f46e5" },
   pitcheiTeshuva:{ hex: "#9333ea" },
+  magenAvraham:  { hex: "#c2410c" },
+  beitShmuel:    { hex: "#be185d" },
+  meiratEinayim: { hex: "#0891b2" },
   heading:       { hex: "#7c3aed" },
 };
 
@@ -36,6 +42,9 @@ export function buildSourceLabel(sourceKey: string, sectionIndex?: number): stri
     case "shulchanArukh":   return `${base} סעיף ${num}`;
     case "taz":             return `${base} ס"ק ${num}`;
     case "shakh":           return `${base} ס"ק ${num}`;
+    case "magenAvraham":    return `${base} ס"ק ${num}`;
+    case "beitShmuel":      return `${base} ס"ק ${num}`;
+    case "meiratEinayim":   return `${base} ס"ק ${num}`;
     case "pitcheiTeshuva":  return `${base} אות ${num}`;
     default:                return base;
   }
@@ -49,6 +58,9 @@ const FULL_SOURCE_NAMES: Record<string, string> = {
   taz: 'ט"ז',
   shakh: 'ש"ך',
   pitcheiTeshuva: "פתחי תשובה",
+  magenAvraham: "מגן אברהם",
+  beitShmuel: "בית שמואל",
+  meiratEinayim: "מאירת עיניים",
 };
 
 /**
@@ -62,7 +74,10 @@ export function buildGroupHeading(sourceKey: string, sectionIndex?: number): str
   switch (sourceKey) {
     case "shulchanArukh":   return `${base} סעיף ${num}`;
     case "taz":
-    case "shakh":           return `${base} ס"ק ${num}`;
+    case "shakh":
+    case "magenAvraham":
+    case "beitShmuel":
+    case "meiratEinayim":   return `${base} ס"ק ${num}`;
     case "pitcheiTeshuva":
     case "beitYosef":
     case "tur":             return `${base} אות ${num}`;
