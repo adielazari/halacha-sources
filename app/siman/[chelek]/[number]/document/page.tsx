@@ -8,6 +8,7 @@ import type { Excerpt } from "@/lib/types";
 import { downloadExport } from "@/lib/downloadExport";
 import { groupExcerpts } from "@/lib/groupExcerpts";
 import SourceViewModal from "@/components/SourceViewModal";
+import BlockAnalysisPanel from "@/components/BlockAnalysisPanel";
 
 type AgentSummary = { id: string; name: string };
 
@@ -123,6 +124,7 @@ function ExcerptItem({ ex, num, nested, onView }: { ex: Excerpt; num: number; ne
           ))}
         </div>
       )}
+      <BlockAnalysisPanel sourceLabel={ex.sourceLabel} sourceText={ex.text} commentaries={ex.commentaries} />
     </div>
   );
 }

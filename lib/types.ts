@@ -31,6 +31,17 @@ export type Excerpt = {
   agentId?: string;
 };
 
+export type PracticalPoint = {
+  what: string;
+  when?: string;
+  how?: string;
+};
+
+export type BlockAnalysisResult = {
+  summary: string;
+  practical_points: PracticalPoint[];
+};
+
 export type AgentLanguage = "he" | "en";
 
 export type AgentDefinition = {
