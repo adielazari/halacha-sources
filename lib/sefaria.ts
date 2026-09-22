@@ -1,4 +1,5 @@
 import { readCache, writeCache } from "./cache";
+import { createHash } from "crypto";
 
 export type BeytYosefText = {
   ref: string;
@@ -248,6 +249,100 @@ export async function fetchTur(
     : String(textContent);
 
   return { ref: raw.ref ?? ref, text };
+}
+
+// One SA se'if plus every mefaresh note anchored exactly to it — the unit
+// behind the "לפי סעיפי שו״ע" view. Built from live Sefaria link data (see
+// buildSeifBlocks below), not from any hardcoded/guessed index alignment.
+export type HalachicBlockNote = {
+  sourceKey: string;   // matches TextsData's keys, e.g. "taz", "magenAvraham"
+  sourceLabel: string; // Hebrew collective title, e.g. "טורי זהב"
+  noteIndex: number;   // 0-based index into that mefaresh's own text[] array
+  html: string;
+};
+
+export type HalachicBlock = {
+  seifIndex: number; // 0-based index into the SA's own text[] array
+  saHtml: string;
+  notes: HalachicBlockNote[];
+  contentHash: string;
+};
+
+// Which directly-anchored-to-the-SA commentaries we currently know how to
+// place into a block, keyed by the Hebrew collectiveTitle Sefaria's links
+// API returns (fetchLinks below prefers .he over .en). Adding a new
+// mefaresh later is just one more line here (plus fetching its text in
+// /api/siman-texts) — the grouping logic itself has no book list baked in
+// beyond this lookup.
+const COLLECTIVE_TITLE_TO_SOURCE_KEY: Record<string, string> = {
+  "טורי זהב": "taz",
+  "שפתי כהן": "shakh",
+  "מגן אברהם": "magenAvraham",
+  "בית שמואל": "beitShmuel",
+  "מאירת עיניים": "meiratEinayim",
+  "פתחי תשובה": "pitcheiTeshuva",
+};
+
+// SA_CHELEK_MAP's values are percent-encoded for the v3 texts API
+// (e.g. "Shulchan_Arukh%2C_Orach_Chayim"); fetchLinks wants a natural,
+// human-readable ref (spaces/commas/apostrophes as-is) since it does its
+// own encodeURIComponent — this just reverses that encoding.
+function naturalSaRef(chelek: string): string | null {
+  const encoded = SA_CHELEK_MAP[chelek];
+  if (!encoded) return null;
+  return decodeURIComponent(encoded.replace(/_/g, " "));
+}
+
+// Groups each SA se'if with the mefaresh notes actually anchored to it,
+// using Sefaria's own link data (per-se'if `fetchLinks` calls) rather than
+// assuming a mefaresh's array index lines up with the SA's se'if number —
+// verified live that this assumption does NOT generally hold (e.g. Magen
+// Avraham can have more notes than a siman has se'ifim).
+//
+// Different mefarshim number their own notes differently on Sefaria (some
+// flat across the whole siman, some nested per-se'if) and neither scheme's
+// ref suffix reliably matches the index into the whole-siman array we
+// already fetch — verified live that it doesn't (e.g. Shakh's ref ends in
+// "1:1:1" for every se'if's first note). What IS reliable, verified across
+// several simanim: for a given mefaresh, the per-se'if link COUNTS from
+// `fetchLinks`, taken in se'if order, exactly partition that mefaresh's
+// whole-siman array in order — i.e. a running per-sourceKey cursor that
+// advances by one for every matching link, in se'if order, lines up.
+export async function buildSeifBlocks(
+  chelek: string,
+  siman: number,
+  saSeifim: string[],
+  mefarshim: Record<string, string[] | null | undefined>
+): Promise<HalachicBlock[]> {
+  const baseRef = naturalSaRef(chelek);
+  if (!baseRef) return [];
+
+  const linksPerSeif = await Promise.all(
+    saSeifim.map((_, i) => fetchLinks(`${baseRef}.${siman}.${i + 1}`).catch(() => []))
+  );
+
+  const cursors: Record<string, number> = {};
+
+  return saSeifim.map((saHtml, i) => {
+    const notes: HalachicBlockNote[] = [];
+    for (const link of linksPerSeif[i]) {
+      if (link.category !== "Commentary") continue;
+      const sourceKey = COLLECTIVE_TITLE_TO_SOURCE_KEY[link.collectiveTitle ?? ""];
+      if (!sourceKey) continue; // not one of the mefarshim we fetch (yet)
+      const noteIndex = cursors[sourceKey] ?? 0;
+      cursors[sourceKey] = noteIndex + 1;
+      const html = mefarshim[sourceKey]?.[noteIndex];
+      if (!html) continue;
+      notes.push({ sourceKey, sourceLabel: link.collectiveTitle ?? sourceKey, noteIndex, html });
+    }
+    // Stable order regardless of link-fetch order, for a stable contentHash.
+    notes.sort((a, b) => (a.sourceKey === b.sourceKey ? a.noteIndex - b.noteIndex : a.sourceKey.localeCompare(b.sourceKey)));
+
+    const hashInput = [saHtml, ...notes.map((n) => `${n.sourceKey}:${n.noteIndex}:${n.html}`)].join("\n");
+    const contentHash = createHash("sha1").update(hashInput).digest("hex");
+
+    return { seifIndex: i, saHtml, notes, contentHash };
+  });
 }
 
 export async function fetchLinks(ref: string): Promise<Link[]> {

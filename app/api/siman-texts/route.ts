@@ -4,6 +4,7 @@ import {
   fetchShulchanArukh,
   fetchMefareshText,
   fetchTur,
+  buildSeifBlocks,
 } from "@/lib/sefaria";
 
 export async function GET(req: NextRequest) {
@@ -56,17 +57,41 @@ export async function GET(req: NextRequest) {
   const fromResult = (r: PromiseSettledResult<{ ref: string; text: string[] } | null>) =>
     r.status === "fulfilled" && r.value ? { ref: r.value.ref, text: r.value.text } : null;
 
+  const taz = fromResult(tazResult);
+  const shakh = fromResult(shakhResult);
+  const pitcheiTeshuva = fromResult(ptResult);
+  const magenAvraham = fromResult(magenAvrahamResult);
+  const beitShmuel = fromResult(beitShmuelResult);
+  const meiratEinayim = fromResult(meiratEinayimResult);
+  const saSeifim = saResult.status === "fulfilled" ? saResult.value.text : [];
+
+  // Additive: groups SA se'ifim with their mefaresh notes for the "לפי
+  // סעיפי שו״ע" view. Failure here must never break the existing
+  // panels-based response, so it's isolated behind its own try/catch.
+  let seifBlocks: Awaited<ReturnType<typeof buildSeifBlocks>> = [];
+  if (saSeifim.length > 0) {
+    try {
+      seifBlocks = await buildSeifBlocks(chelek, siman, saSeifim, {
+        taz: taz?.text, shakh: shakh?.text, pitcheiTeshuva: pitcheiTeshuva?.text,
+        magenAvraham: magenAvraham?.text, beitShmuel: beitShmuel?.text, meiratEinayim: meiratEinayim?.text,
+      });
+    } catch {
+      seifBlocks = [];
+    }
+  }
+
   return NextResponse.json(
     {
       tur: turResult.status === "fulfilled" ? turResult.value : null,
       beitYosef: byResult.status === "fulfilled" ? { ref: byResult.value.ref, text: byResult.value.text } : null,
       shulchanArukh: saResult.status === "fulfilled" ? { ref: saResult.value.ref, text: saResult.value.text } : null,
-      taz: fromResult(tazResult),
-      shakh: fromResult(shakhResult),
-      pitcheiTeshuva: fromResult(ptResult),
-      magenAvraham: fromResult(magenAvrahamResult),
-      beitShmuel: fromResult(beitShmuelResult),
-      meiratEinayim: fromResult(meiratEinayimResult),
+      taz,
+      shakh,
+      pitcheiTeshuva,
+      magenAvraham,
+      beitShmuel,
+      meiratEinayim,
+      seifBlocks,
     },
     { headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" } }
   );

@@ -15,11 +15,16 @@ export type ApprovedSource = {
   seifIndex?: number;
 };
 
+export type ViewMode = "panels" | "seifim";
+
 type Store = {
   chelek: string;
   siman: string;
   excerpts: Excerpt[];
   expandedPanels: Record<string, boolean>;
+  viewMode: ViewMode;
+
+  setViewMode(mode: ViewMode): void;
 
   addExcerpt(excerpt: Omit<Excerpt, "id"> & { id?: string }): void;
   setExcerptAnnotationId(excerptId: string, annotationId: string): void;
@@ -30,7 +35,7 @@ type Store = {
   addHeading(afterId: string | null, text: string, align: "right" | "center" | "left", level?: 1 | 2 | 3): void;
   updateHeading(id: string, text: string, align: "right" | "center" | "left", level: 1 | 2 | 3): void;
   updateExcerptText(id: string, text: string): void;
-  updateExcerptFields(id: string, fields: Partial<Pick<Excerpt, "text" | "sourceLabel" | "sourceRef" | "commentaries" | "sectionIndex">>): void;
+  updateExcerptFields(id: string, fields: Partial<Pick<Excerpt, "text" | "sourceLabel" | "sourceRef" | "commentaries" | "sectionIndex" | "linkedSeif" | "hidden">>): void;
   togglePanel(key: string): void;
   setSession(chelek: string, siman: string): void;
   loadDocument(excerpts: Excerpt[], expandedPanels: Record<string, boolean>): void;
@@ -44,6 +49,9 @@ export const useStore = create<Store>()(
       siman: "",
       excerpts: [],
       expandedPanels: { shulchanArukh: true },
+      viewMode: "panels",
+
+      setViewMode: (mode) => set({ viewMode: mode }),
 
       addExcerpt: (excerpt) =>
         set((state) => ({
@@ -156,6 +164,7 @@ export const useStore = create<Store>()(
             siman,
             excerpts: [],
             expandedPanels: { shulchanArukh: true },
+            viewMode: "panels",
           };
         }),
 
@@ -168,6 +177,7 @@ export const useStore = create<Store>()(
           siman: "",
           excerpts: [],
           expandedPanels: { shulchanArukh: true },
+          viewMode: "panels",
         }),
     }),
     {
@@ -198,6 +208,7 @@ export const useStore = create<Store>()(
         siman: state.siman,
         excerpts: state.excerpts,
         expandedPanels: state.expandedPanels,
+        viewMode: state.viewMode,
       }),
     }
   )

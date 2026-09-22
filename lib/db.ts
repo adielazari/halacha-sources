@@ -1,10 +1,10 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import type { AgentDefinition, AgentLanguage, Annotation, Collection, CollectionSiman, CollectionWithSimanim, CommentaryEntry, Excerpt, Group, GroupMember, GroupRole, GroupSiman, GroupWithDetails, OrgMode } from "./types";
+import type { AgentDefinition, AgentLanguage, Annotation, Collection, CollectionSiman, CollectionWithSimanim, CommentaryEntry, Excerpt, Group, GroupMember, GroupRole, GroupSiman, GroupWithDetails, OrgMode, PracticalPoint } from "./types";
 
 // Increment this whenever the schema changes — forces re-run after HMR reloads
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const SEED_PRACTICAL_POINTS_PROMPT =
   "אתה עוזר הלכתי. קיבלת את הטקסטים ההלכתיים הגולמיים של הסימן (טור, בית יוסף, שולחן ערוך, ט\"ז, ש\"ך, פתחי תשובה) וכן את קטעי המקורות שהמשתמש כבר בחר ותקצר בעצמו עבור סימן זה. " +
@@ -101,6 +101,23 @@ function applySchema(db: Database.Database) {
       language      TEXT NOT NULL DEFAULT 'he',
       created_at    TEXT DEFAULT (datetime('now')),
       updated_at    TEXT DEFAULT (datetime('now'))
+    );
+
+    -- One row per HalachicBlock (a Shulchan Arukh se'if + its mefaresh
+    -- notes) that's been AI-analyzed, for the "לפי סעיפי שו״ע" view.
+    -- content_hash is the block's contentHash at generation time — compared
+    -- against the live block's current hash to detect staleness (a mefaresh
+    -- added later) without ever deleting the previous analysis; a
+    -- regenerate just overwrites this row in place.
+    CREATE TABLE IF NOT EXISTS block_analyses (
+      chelek           TEXT NOT NULL,
+      siman            TEXT NOT NULL,
+      seif_index       INTEGER NOT NULL,
+      content_hash     TEXT NOT NULL,
+      summary          TEXT NOT NULL,
+      practical_points TEXT NOT NULL DEFAULT '[]',
+      created_at       TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (chelek, siman, seif_index)
     );
   `);
 
@@ -490,6 +507,75 @@ export function deleteAgentDefinition(id: string): boolean {
   const db = getDb();
   const result = db.prepare("DELETE FROM agent_definitions WHERE id = ?").run(id);
   return result.changes > 0;
+}
+
+// ── Block analyses (AI summary + practical points per HalachicBlock) ───────────
+
+export type BlockAnalysisRow = {
+  chelek: string;
+  siman: string;
+  seifIndex: number;
+  contentHash: string;
+  summary: string;
+  practicalPoints: PracticalPoint[];
+  createdAt: string;
+};
+
+type BlockAnalysisDbRow = {
+  chelek: string;
+  siman: string;
+  seif_index: number;
+  content_hash: string;
+  summary: string;
+  practical_points: string;
+  created_at: string;
+};
+
+function rowToBlockAnalysis(row: BlockAnalysisDbRow): BlockAnalysisRow {
+  let practicalPoints: PracticalPoint[] = [];
+  try { practicalPoints = JSON.parse(row.practical_points) as PracticalPoint[]; } catch { /* empty */ }
+  return {
+    chelek: row.chelek,
+    siman: row.siman,
+    seifIndex: row.seif_index,
+    contentHash: row.content_hash,
+    summary: row.summary,
+    practicalPoints,
+    createdAt: row.created_at,
+  };
+}
+
+export function getBlockAnalyses(chelek: string, siman: string): BlockAnalysisRow[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM block_analyses WHERE chelek = ? AND siman = ?"
+  ).all(chelek, siman) as BlockAnalysisDbRow[];
+  return rows.map(rowToBlockAnalysis);
+}
+
+export function upsertBlockAnalysis(data: {
+  chelek: string;
+  siman: string;
+  seifIndex: number;
+  contentHash: string;
+  summary: string;
+  practicalPoints: PracticalPoint[];
+}): BlockAnalysisRow {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO block_analyses (chelek, siman, seif_index, content_hash, summary, practical_points, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(chelek, siman, seif_index)
+    DO UPDATE SET content_hash = excluded.content_hash, summary = excluded.summary,
+                  practical_points = excluded.practical_points, created_at = datetime('now')
+  `).run(
+    data.chelek, data.siman, data.seifIndex, data.contentHash,
+    data.summary, JSON.stringify(data.practicalPoints)
+  );
+  const row = db.prepare(
+    "SELECT * FROM block_analyses WHERE chelek = ? AND siman = ? AND seif_index = ?"
+  ).get(data.chelek, data.siman, data.seifIndex) as BlockAnalysisDbRow;
+  return rowToBlockAnalysis(row);
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
