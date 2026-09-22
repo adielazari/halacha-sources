@@ -29,6 +29,17 @@ export type Excerpt = {
   // Set on the batch heading + every point produced by an agent run — lets a
   // full previous run be found and replaced as one unit on rerun.
   agentId?: string;
+  // 0-based Shulchan Arukh se'if index this excerpt belongs to, set
+  // manually by the user — there's no reliable automatic mapping for Tur/
+  // Beit Yosef (unlike the SA-anchored mefarshim in HalachicBlock, see
+  // lib/sefaria.ts). The "לפי סעיפי שו״ע" view merges any excerpt tagged
+  // this way (plus its own `commentaries`) into that se'if's block.
+  linkedSeif?: number;
+  // Explicit override of whether this excerpt appears on the final/printed
+  // document. undefined = use the type-based default (see
+  // isHiddenByDefault in lib/sourceLabels.ts) — the base SA/Tur/Beit Yosef
+  // text is hidden by default there, everything else shows.
+  hidden?: boolean;
 };
 
 export type PracticalPoint = {

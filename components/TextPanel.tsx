@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Annotation } from "@/lib/types";
 import { highlightAnnotations } from "@/lib/highlightAnnotations";
+import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 
 interface Section {
   index: number;
@@ -23,6 +24,17 @@ interface TextPanelProps {
   onSectionClick?: (sourceKey: string, sectionIndex: number, label: string) => void;
   heightPx?: number;
   onHeightChange?: (px: number) => void;
+  // Applied to the header only (not the content) — HTML5 drag-and-drop
+  // treats any draggable ancestor as a valid drag origin for a mouse-drag
+  // gesture starting anywhere inside it, which used to swallow ordinary
+  // text-selection drags anywhere in the panel's body.
+  draggable?: boolean;
+  // Lets a section's own label (e.g. a Beit Yosef paragraph's "א") open an
+  // inline SA se'if picker — no reliable automatic Beit Yosef↔se'if mapping
+  // exists, so this is how the user builds that link by hand as they study.
+  maxSeif?: number;
+  linkedSeifBySection?: Record<number, number>;
+  onLinkSeif?: (sectionIndex: number, seif: number | undefined) => void;
 }
 
 export default function TextPanel({
@@ -38,8 +50,13 @@ export default function TextPanel({
   onSectionClick,
   heightPx,
   onHeightChange,
+  draggable,
+  maxSeif,
+  linkedSeifBySection,
+  onLinkSeif,
 }: TextPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [seifPickerOpen, setSeifPickerOpen] = useState<number | null>(null);
 
   // Feed the native CSS resize-handle drag back into the persisted preference.
   // Read offsetHeight (border-box, matches the `style.height` we set below
@@ -67,7 +84,8 @@ export default function TextPanel({
     <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-3 text-right select-none hover:brightness-95 transition"
+        draggable={draggable}
+        className={`w-full flex items-center gap-3 px-4 py-3 text-right select-none hover:brightness-95 transition ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
         style={{ backgroundColor: hexColor + "18" }}
       >
         <span className="text-xs font-bold flex-shrink-0" style={{ color: hexColor }}>
@@ -118,6 +136,41 @@ export default function TextPanel({
                         >
                           {sec.label}{" "}
                         </button>
+                      ) : onLinkSeif && maxSeif ? (
+                        <span onClick={(e) => e.stopPropagation()}>
+                          {seifPickerOpen === sec.index ? (
+                            <select
+                              autoFocus
+                              defaultValue={linkedSeifBySection?.[sec.index] !== undefined ? String(linkedSeifBySection[sec.index] + 1) : ""}
+                              onChange={(e) => {
+                                const n = parseInt(e.target.value, 10);
+                                onLinkSeif(sec.index, Number.isFinite(n) && n > 0 ? n - 1 : undefined);
+                                setSeifPickerOpen(null);
+                              }}
+                              onBlur={() => setSeifPickerOpen(null)}
+                              className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            >
+                              <option value="">ללא</option>
+                              {Array.from({ length: maxSeif }, (_, i) => (
+                                <option key={i} value={i + 1}>סעיף {toHebrewNumeral(i + 1)}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button
+                              onClick={() => setSeifPickerOpen(sec.index)}
+                              className="text-xs font-bold hover:underline cursor-pointer transition-opacity hover:opacity-70"
+                              style={{ color: hexColor }}
+                              title="קשר לסעיף בשולחן ערוך"
+                            >
+                              {sec.label}{" "}
+                              {linkedSeifBySection?.[sec.index] !== undefined && (
+                                <span className="text-gray-400 font-normal">
+                                  (→ סעיף {toHebrewNumeral(linkedSeifBySection[sec.index] + 1)})
+                                </span>
+                              )}
+                            </button>
+                          )}
+                        </span>
                       ) : (
                         <strong className="text-xs font-bold" style={{ color: hexColor }}>
                           {sec.label}{" "}

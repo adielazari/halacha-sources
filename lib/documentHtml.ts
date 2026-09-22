@@ -1,6 +1,7 @@
 import type { Excerpt } from "./types";
 import { toHebrewNumeral } from "./hebrewNumerals";
 import { groupExcerpts } from "./groupExcerpts";
+import { isExcerptHidden } from "./sourceLabels";
 
 export const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -81,8 +82,14 @@ export function renderSimanSection(chelek: string, siman: string, excerpts: Exce
   const chelekLabel = CHELEK_LABELS[chelek] ?? chelek;
   const simanLabel = toHebrewNumeral(parseInt(siman, 10));
 
+  // The base SA/Tur/Beit Yosef text is excluded from the final printed/
+  // exported document by default (see Excerpt.hidden in lib/types.ts) —
+  // this is the actual "final output", unlike the always-shows-everything
+  // sidebar/document-page preview.
+  const visibleExcerpts = excerpts.filter((e) => !isExcerptHidden(e));
+
   let sourceCounter = 0;
-  const blocks = groupExcerpts(excerpts);
+  const blocks = groupExcerpts(visibleExcerpts);
   const body = blocks.length
     ? blocks
         .map((block) => {

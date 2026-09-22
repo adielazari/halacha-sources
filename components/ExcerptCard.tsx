@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { Excerpt, DocItemType } from "@/lib/types";
-import { getHex } from "@/lib/sourceLabels";
+import { getHex, AUTO_MATCHED_SEIF_SOURCE_KEYS, isExcerptHidden } from "@/lib/sourceLabels";
+import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import { HeadingToolbar } from "./HeadingToolbar";
 import type { HeadingAlign } from "./HeadingToolbar";
 
@@ -23,7 +24,10 @@ type ExcerptCardProps = {
   onAddHeading: (afterId: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
   onUpdateHeading: (id: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
   onUpdateText: (id: string, text: string) => void;
+  onSetLinkedSeif: (id: string, seif: number | undefined) => void;
+  onToggleHidden: (id: string, hidden: boolean) => void;
   dragHandlers: DragHandlers;
+  maxSeif?: number;
 };
 
 const EDITABLE_TEXT_TYPES: DocItemType[] = ["explanation", "question", "answer"];
@@ -48,15 +52,29 @@ export default function ExcerptCard({
   onAddHeading,
   onUpdateHeading,
   onUpdateText,
+  onSetLinkedSeif,
+  onToggleHidden,
   dragHandlers,
+  maxSeif,
 }: ExcerptCardProps) {
   const itemType = excerpt.type ?? "source";
   const hex = getHex(excerpt.sourceKey);
   const typeStyle = TYPE_STYLES[itemType] ?? TYPE_STYLES.source;
   const preview = excerpt.text.replace(/<[^>]+>/g, "").slice(0, 100);
   const truncated = excerpt.text.replace(/<[^>]+>/g, "").length > 100;
+  // Tur/Beit Yosef/manual/etc — no automatic SA se'if mapping, so offer a
+  // manual link. Excerpts of an already-auto-matched mefaresh don't need it.
+  const canLinkToSeif = itemType === "source" && !AUTO_MATCHED_SEIF_SOURCE_KEYS.has(excerpt.sourceKey);
+  const hidden = itemType === "source" && isExcerptHidden(excerpt);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [linkSeifEditing, setLinkSeifEditing] = useState(false);
+
+  function selectLinkedSeif(value: string) {
+    const n = parseInt(value, 10);
+    onSetLinkedSeif(excerpt.id, Number.isFinite(n) && n > 0 ? n - 1 : undefined);
+    setLinkSeifEditing(false);
+  }
   const [annotationMode, setAnnotationMode] = useState<DocItemType | null>(null);
   const [annotationText, setAnnotationText] = useState("");
 
@@ -131,7 +149,7 @@ export default function ExcerptCard({
         onDragOver={dragHandlers.onDragOver}
         onDrop={dragHandlers.onDrop}
         onDragEnd={dragHandlers.onDragEnd}
-        className="bg-white border border-gray-200 rounded-lg p-3 mb-1 cursor-grab active:cursor-grabbing select-none"
+        className={`bg-white border border-gray-200 rounded-lg p-3 mb-1 cursor-grab active:cursor-grabbing select-none ${hidden ? "opacity-50" : ""}`}
         style={borderStyle}
       >
         <div className="flex items-start gap-2">
@@ -194,6 +212,37 @@ export default function ExcerptCard({
                   )}
                   <span className="text-xs text-gray-400 mr-auto">{index + 1}</span>
                 </div>
+                {canLinkToSeif && (
+                  <div className="mb-1" dir="rtl" onClick={(e) => e.stopPropagation()}>
+                    {linkSeifEditing && maxSeif ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-500">→ סעיף:</span>
+                        <select
+                          autoFocus
+                          defaultValue={excerpt.linkedSeif !== undefined ? String(excerpt.linkedSeif + 1) : ""}
+                          onChange={(e) => selectLinkedSeif(e.target.value)}
+                          onBlur={() => setLinkSeifEditing(false)}
+                          className="border border-gray-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        >
+                          <option value="">ללא</option>
+                          {Array.from({ length: maxSeif }, (_, i) => (
+                            <option key={i} value={i + 1}>{toHebrewNumeral(i + 1)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setLinkSeifEditing(true)}
+                        className="text-xs text-gray-400 hover:text-blue-600 transition"
+                        title="קשר לסעיף בשולחן ערוך, כדי שיופיע יחד איתו בתצוגת 'לפי סעיפי שו״ע'"
+                      >
+                        {excerpt.linkedSeif !== undefined
+                          ? `→ סעיף ${toHebrewNumeral(excerpt.linkedSeif + 1)}`
+                          : "→ קשר לסעיף..."}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {EDITABLE_TEXT_TYPES.includes(itemType) && textEditMode ? (
                   <div dir="rtl" onClick={(e) => e.stopPropagation()}>
                     <textarea
@@ -264,6 +313,16 @@ export default function ExcerptCard({
                 title="ערוך מקור"
               >
                 ✎
+              </button>
+            )}
+            {itemType === "source" && (
+              <button
+                onClick={() => onToggleHidden(excerpt.id, !hidden)}
+                className="text-gray-400 hover:text-blue-500 transition text-xs leading-none"
+                aria-label={hidden ? "הצג בדף הסופי" : "הסתר מהדף הסופי"}
+                title={hidden ? "מוסתר מהדף הסופי — לחץ להצגה" : "מוצג בדף הסופי — לחץ להסתרה"}
+              >
+                {hidden ? "🙈" : "👁"}
               </button>
             )}
             <div className="w-full border-t border-gray-100 my-0.5" />

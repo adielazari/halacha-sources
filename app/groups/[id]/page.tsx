@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { GroupWithDetails, GroupRole, GroupMember, JoinRequest } from "@/lib/types";
 import { getSimanTopic } from "@/lib/simanTopics";
+import { fromHebrewNumeral } from "@/lib/hebrewNumerals";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים", YorehDeah: "יורה דעה",
@@ -61,7 +62,7 @@ export default function GroupPage() {
   useEffect(() => { if (grp?.myRole === "owner") loadRequests(); }, [grp?.myRole, loadRequests]);
 
   async function addSiman_() {
-    const n = parseInt(addSiman, 10);
+    const n = fromHebrewNumeral(addSiman) ?? parseInt(addSiman, 10);
     if (!n || n < 1) { setAddErr("מספר לא תקין"); return; }
     setAdding(true); setAddErr("");
     const res = await fetch(`/api/groups/${params.id}/simanim`, {
@@ -214,8 +215,8 @@ export default function GroupPage() {
                 </div>
                 <div className="flex-1 min-w-24">
                   <label className="block text-xs text-leket-muted mb-1">סימן</label>
-                  <input type="number" min={1} value={addSiman} onChange={(e) => { setAddSiman(e.target.value); setAddErr(""); }}
-                    placeholder="מספר" className="leket-input text-sm py-1.5" />
+                  <input type="text" value={addSiman} onChange={(e) => { setAddSiman(e.target.value); setAddErr(""); }}
+                    placeholder="מספר או אותיות" className="leket-input text-sm py-1.5" />
                 </div>
                 <button onClick={addSiman_} disabled={adding} className="leket-btn-primary px-4 py-2 rounded-xl text-sm shrink-0">
                   {adding ? "..." : "+ הוסף"}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { CollectionWithSimanim } from "@/lib/types";
 import { getSimanTopic } from "@/lib/simanTopics";
 import { downloadExport } from "@/lib/downloadExport";
+import { fromHebrewNumeral } from "@/lib/hebrewNumerals";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim:    "אורח חיים",
@@ -34,7 +35,7 @@ function AddSimanPanel({ collectionId, onAdded }: { collectionId: string; onAdde
   const [err, setErr] = useState("");
 
   async function add() {
-    const n = parseInt(simanNum, 10);
+    const n = fromHebrewNumeral(simanNum) ?? parseInt(simanNum, 10);
     if (!n || n < 1) { setErr("מספר סימן לא תקין"); return; }
     setSaving(true); setErr("");
     const res = await fetch(`/api/collections/${collectionId}/simanim`, {
@@ -57,12 +58,11 @@ function AddSimanPanel({ collectionId, onAdded }: { collectionId: string; onAdde
       </select>
       <div className="flex gap-2">
         <input
-          type="number"
+          type="text"
           value={simanNum}
           onChange={(e) => { setSimanNum(e.target.value); setErr(""); }}
-          placeholder="מספר סימן"
+          placeholder="מספר או אותיות"
           className="leket-input text-sm py-1.5 flex-1"
-          min={1}
         />
         <button onClick={add} disabled={saving} className="leket-btn-primary px-3 py-1.5 rounded-lg text-sm shrink-0">
           {saving ? "..." : "+"}

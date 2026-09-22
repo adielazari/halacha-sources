@@ -1,4 +1,5 @@
 import { toHebrewNumeral } from "./hebrewNumerals";
+import type { Excerpt } from "./types";
 
 export const SOURCE_LABELS: Record<string, string> = {
   shulchanArukh: 'שו"ע',
@@ -28,6 +29,28 @@ export const SOURCE_COLORS: Record<string, { hex: string }> = {
 export function getHex(sourceKey: string): string {
   return SOURCE_COLORS[sourceKey]?.hex ?? "#6b7280";
 }
+
+// The base text itself (as opposed to a commentary/insight on it) — hidden
+// from the final printed document by default, since the reader presumably
+// already knows it; a specific commentary/added source the user curated
+// stays visible. See Excerpt.hidden in lib/types.ts for the override.
+const HIDDEN_BY_DEFAULT_SOURCE_KEYS = new Set(["shulchanArukh", "tur", "beitYosef"]);
+
+export function isHiddenByDefault(excerpt: Excerpt): boolean {
+  return (excerpt.type ?? "source") === "source" && HIDDEN_BY_DEFAULT_SOURCE_KEYS.has(excerpt.sourceKey);
+}
+
+export function isExcerptHidden(excerpt: Excerpt): boolean {
+  return excerpt.hidden ?? isHiddenByDefault(excerpt);
+}
+
+// Source keys the "לפי סעיפי שו״ע" view already places automatically (via
+// Sefaria's own link data — see buildSeifBlocks in lib/sefaria.ts). Anything
+// else (tur, beitYosef, manual, midrash, ...) has no reliable automatic
+// mapping and can be tagged with a se'if manually (Excerpt.linkedSeif).
+export const AUTO_MATCHED_SEIF_SOURCE_KEYS = new Set([
+  "shulchanArukh", "taz", "shakh", "magenAvraham", "beitShmuel", "meiratEinayim", "pitcheiTeshuva",
+]);
 
 /** Returns just "א.", "ב.", etc. — used for commentator section labels */
 export function buildSectionNumber(index: number): string {

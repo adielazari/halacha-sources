@@ -7,6 +7,7 @@ import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import type { Excerpt } from "@/lib/types";
 import { downloadExport } from "@/lib/downloadExport";
 import { groupExcerpts } from "@/lib/groupExcerpts";
+import { AUTO_MATCHED_SEIF_SOURCE_KEYS, isExcerptHidden } from "@/lib/sourceLabels";
 import SourceViewModal from "@/components/SourceViewModal";
 import BlockAnalysisPanel from "@/components/BlockAnalysisPanel";
 
@@ -19,8 +20,22 @@ const CHELEK_LABELS: Record<string, string> = {
   ChoshenMishpat: "חושן משפט",
 };
 
-function ExcerptItem({ ex, num, nested, onView }: { ex: Excerpt; num: number; nested?: boolean; onView?: (ex: Excerpt) => void }) {
+function ExcerptItem({ ex, num, nested, onView, onSetLinkedSeif, onToggleHidden, maxSeif }: {
+  ex: Excerpt; num: number; nested?: boolean;
+  onView?: (ex: Excerpt) => void;
+  onSetLinkedSeif?: (id: string, seif: number | undefined) => void;
+  onToggleHidden?: (id: string, hidden: boolean) => void;
+  maxSeif?: number;
+}) {
   const itemType = ex.type ?? "source";
+  const canLinkToSeif = itemType === "source" && !AUTO_MATCHED_SEIF_SOURCE_KEYS.has(ex.sourceKey);
+  const [linkSeifEditing, setLinkSeifEditing] = useState(false);
+
+  function selectLinkedSeif(value: string) {
+    const n = parseInt(value, 10);
+    onSetLinkedSeif?.(ex.id, Number.isFinite(n) && n > 0 ? n - 1 : undefined);
+    setLinkSeifEditing(false);
+  }
 
   if (itemType === "heading") {
     const align = ex.headingAlign ?? "right";
@@ -100,6 +115,44 @@ function ExcerptItem({ ex, num, nested, onView }: { ex: Excerpt; num: number; ne
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-bold text-gray-400">{num}.</span>
         <span className="text-sm font-bold text-gray-800">{ex.sourceLabel}</span>
+        {canLinkToSeif && (
+          <span onClick={(e) => e.stopPropagation()}>
+            {linkSeifEditing && maxSeif ? (
+              <span className="inline-flex items-center gap-1">
+                <span className="text-xs text-gray-500">→ סעיף:</span>
+                <select
+                  autoFocus
+                  defaultValue={ex.linkedSeif !== undefined ? String(ex.linkedSeif + 1) : ""}
+                  onChange={(e) => selectLinkedSeif(e.target.value)}
+                  onBlur={() => setLinkSeifEditing(false)}
+                  className="border border-gray-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                >
+                  <option value="">ללא</option>
+                  {Array.from({ length: maxSeif }, (_, i) => (
+                    <option key={i} value={i + 1}>{toHebrewNumeral(i + 1)}</option>
+                  ))}
+                </select>
+              </span>
+            ) : (
+              <button
+                onClick={() => setLinkSeifEditing(true)}
+                className="text-xs text-gray-400 hover:text-blue-600 transition"
+                title="קשר לסעיף בשולחן ערוך, כדי שיופיע יחד איתו בתצוגת 'לפי סעיפי שו״ע'"
+              >
+                {ex.linkedSeif !== undefined ? `→ סעיף ${toHebrewNumeral(ex.linkedSeif + 1)}` : "→ קשר לסעיף..."}
+              </button>
+            )}
+          </span>
+        )}
+        {onToggleHidden && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleHidden(ex.id, true); }}
+            className="no-print text-xs text-gray-400 hover:text-blue-600 transition mr-auto"
+            title="הסתר מהדף הסופי"
+          >
+            🙈 הסתר
+          </button>
+        )}
       </div>
       <p
         className="text-sm leading-loose text-gray-800"
@@ -134,12 +187,17 @@ export default function DocumentPage() {
   const router = useRouter();
   const chelek = params.chelek as string;
   const number = params.number as string;
-  const { excerpts } = useStore();
+  const { excerpts, updateExcerptFields } = useStore();
+  const visibleExcerpts = excerpts.filter((e) => !isExcerptHidden(e));
+  const hiddenExcerpts = excerpts.filter(isExcerptHidden);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
   const [runError, setRunError] = useState("");
   const [viewingExcerpt, setViewingExcerpt] = useState<Excerpt | null>(null);
+  // Just for bounding the "→ קשר לסעיף" input — this page has no other need
+  // for the raw Sefaria texts, so only the SA se'if count is kept.
+  const [maxSeif, setMaxSeif] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -147,6 +205,15 @@ export default function DocumentPage() {
       .then((data: { agents?: AgentSummary[] }) => setAgents(data.agents ?? []))
       .catch(() => {/* silent */});
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/siman-texts?chelek=${chelek}&siman=${number}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { shulchanArukh?: { text: string[] } } | null) => {
+        setMaxSeif(data?.shulchanArukh?.text.length);
+      })
+      .catch(() => {/* silent — bounding is a nicety, not required */});
+  }, [chelek, number]);
 
   async function handleRunAgent(agentId: string) {
     setRunningAgentId(agentId);
@@ -177,8 +244,9 @@ export default function DocumentPage() {
       "",
     ];
     let sourceCounter = 0;
-    for (let i = 0; i < excerpts.length; i++) {
-      const ex = excerpts[i];
+    const exportedExcerpts = excerpts.filter((e) => !isExcerptHidden(e));
+    for (let i = 0; i < exportedExcerpts.length; i++) {
+      const ex = exportedExcerpts[i];
       const itemType = ex.type ?? "source";
       if (itemType === "heading") {
         lines.push(`--- ${ex.text} ---`);
@@ -342,28 +410,51 @@ export default function DocumentPage() {
 
         {excerpts.length === 0 ? (
           <p className="text-center text-gray-400">לא נבחרו מקורות</p>
+        ) : visibleExcerpts.length === 0 ? (
+          <p className="text-center text-gray-400">כל המקורות מוסתרים מהדף הסופי</p>
         ) : (
           <div className="space-y-6">
             {(() => {
               let counter = 0;
-              return groupExcerpts(excerpts).map((block) => {
+              return groupExcerpts(visibleExcerpts).map((block) => {
                 if (block.kind === "single") {
                   const isSource = (block.item.type ?? "source") === "source";
                   if (isSource) counter++;
-                  return <ExcerptItem key={block.item.id} ex={block.item} num={counter} onView={isSource ? setViewingExcerpt : undefined} />;
+                  return <ExcerptItem key={block.item.id} ex={block.item} num={counter} onView={isSource ? setViewingExcerpt : undefined} onSetLinkedSeif={(id, seif) => updateExcerptFields(id, { linkedSeif: seif })} onToggleHidden={isSource ? (id, hidden) => updateExcerptFields(id, { hidden }) : undefined} maxSeif={maxSeif} />;
                 }
                 return (
                   <div key={block.items[0].id} className="border border-amber-200 bg-amber-50/50 rounded-lg p-4 space-y-4">
                     <p className="text-sm font-bold text-amber-800">{block.heading}</p>
                     {block.items.map((ex) => {
                       counter++;
-                      return <ExcerptItem key={ex.id} ex={ex} num={counter} nested onView={setViewingExcerpt} />;
+                      return <ExcerptItem key={ex.id} ex={ex} num={counter} nested onView={setViewingExcerpt} onSetLinkedSeif={(id, seif) => updateExcerptFields(id, { linkedSeif: seif })} onToggleHidden={(id, hidden) => updateExcerptFields(id, { hidden })} maxSeif={maxSeif} />;
                     })}
                   </div>
                 );
               });
             })()}
           </div>
+        )}
+
+        {hiddenExcerpts.length > 0 && (
+          <details className="no-print mt-8 text-sm">
+            <summary className="cursor-pointer text-gray-400 hover:text-gray-600">
+              מקורות מוסתרים מהדף הסופי ({hiddenExcerpts.length})
+            </summary>
+            <div className="mt-2 space-y-1">
+              {hiddenExcerpts.map((ex) => (
+                <div key={ex.id} className="flex items-center justify-between gap-2 py-1 opacity-60">
+                  <span className="text-xs text-gray-500">{ex.sourceLabel}</span>
+                  <button
+                    onClick={() => updateExcerptFields(ex.id, { hidden: false })}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    הצג
+                  </button>
+                </div>
+              ))}
+            </div>
+          </details>
         )}
       </div>
 

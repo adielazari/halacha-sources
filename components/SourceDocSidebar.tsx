@@ -21,6 +21,9 @@ type SourceDocSidebarProps = {
   onAddHeading: (afterId: string | null, text: string, align: HeadingAlign, level?: 1 | 2 | 3) => void;
   onUpdateHeading: (id: string, text: string, align: HeadingAlign, level: 1 | 2 | 3) => void;
   onUpdateText: (id: string, text: string) => void;
+  onSetLinkedSeif: (id: string, seif: number | undefined) => void;
+  onToggleHidden: (id: string, hidden: boolean) => void;
+  maxSeif?: number;
   onAddManual: (payload: ManualEntryPayload) => void;
   onEdit: (excerptId: string) => void;
   onViewOrigin: (excerptId: string) => void;
@@ -39,6 +42,9 @@ export default function SourceDocSidebar({
   onAddHeading,
   onUpdateHeading,
   onUpdateText,
+  onSetLinkedSeif,
+  onToggleHidden,
+  maxSeif,
   onAddManual,
   onEdit,
   onViewOrigin,
@@ -177,6 +183,9 @@ export default function SourceDocSidebar({
                   onAddHeading={(afterId, text, align, level) => onAddHeading(afterId, text, align, level)}
                   onUpdateHeading={(id, text, align, level) => onUpdateHeading(id, text, align, level)}
                   onUpdateText={(id, text) => onUpdateText(id, text)}
+                  onSetLinkedSeif={(id, seif) => onSetLinkedSeif(id, seif)}
+                  onToggleHidden={(id, hidden) => onToggleHidden(id, hidden)}
+                  maxSeif={maxSeif}
                   dragHandlers={{
                     onDragStart: (e) => {
                       dragIndex.current = idx;

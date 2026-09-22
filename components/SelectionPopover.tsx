@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { buildSourceLabel } from "@/lib/sourceLabels";
+import { buildSourceLabel, AUTO_MATCHED_SEIF_SOURCE_KEYS } from "@/lib/sourceLabels";
+import { fromHebrewNumeral, toHebrewNumeral } from "@/lib/hebrewNumerals";
 
 const COMMENTATOR_KEYS = new Set([
   "beitYosef", "taz", "shakh", "pitcheiTeshuva",
@@ -23,6 +24,7 @@ type AddParams = {
   text: string;
   sourceLabel: string;
   note?: string;
+  linkedSeif?: number;
 };
 
 type TextsData = {
@@ -54,13 +56,23 @@ type FreeTextState = {
   sourceLabel: string;
   value: string;
   note: string;
+  seifValue: string;
 };
 
-// Pending-add state: waiting for user to optionally add a note before confirming
+// Pending-add state: waiting for user to optionally add a note (and, for
+// Tur/Beit Yosef/manual sources, a linked SA se'if) before confirming
 type PendingAdd = {
-  params: Omit<AddParams, "note">;
+  params: Omit<AddParams, "note" | "linkedSeif">;
   note: string;
+  seifValue: string;
 };
+
+function parseSeifValue(s: string): number | undefined {
+  const trimmed = s.trim();
+  if (!trimmed) return undefined;
+  const n = fromHebrewNumeral(trimmed) ?? parseInt(trimmed, 10);
+  return Number.isFinite(n) && n! > 0 ? n! - 1 : undefined;
+}
 
 function getSourceElement(node: Node | null): Element | null {
   let el: Node | null = node;
@@ -112,11 +124,13 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
   if (!selInfo && !freeText && !pendingAdd) return null;
 
   const isCommentator = selInfo ? COMMENTATOR_KEYS.has(selInfo.sourceKey) : false;
+  const maxSeif = texts?.shulchanArukh?.text.length;
+  const canLinkToSeif = (sourceKey: string) => !AUTO_MATCHED_SEIF_SOURCE_KEYS.has(sourceKey);
 
   function handleDirectAdd(e: React.MouseEvent) {
     e.preventDefault();
     if (!selInfo) return;
-    const params: Omit<AddParams, "note"> = {
+    const params: Omit<AddParams, "note" | "linkedSeif"> = {
       sourceKey: selInfo.sourceKey,
       sectionIndex: selInfo.sectionIndex,
       text: selInfo.text,
@@ -124,7 +138,7 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
     };
     window.getSelection()?.removeAllRanges();
     setSelInfo(null);
-    setPendingAdd({ params, note: "" });
+    setPendingAdd({ params, note: "", seifValue: "" });
   }
 
   function handleDefineSource(e: React.MouseEvent) {
@@ -144,6 +158,7 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
       sourceLabel: buildSourceLabel(selInfo.sourceKey, selInfo.sectionIndex),
       value: "",
       note: "",
+      seifValue: "",
     });
     window.getSelection()?.removeAllRanges();
     setSelInfo(null);
@@ -151,7 +166,11 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
 
   function confirmPendingAdd() {
     if (!pendingAdd) return;
-    onAdd({ ...pendingAdd.params, note: pendingAdd.note || undefined });
+    onAdd({
+      ...pendingAdd.params,
+      note: pendingAdd.note || undefined,
+      linkedSeif: parseSeifValue(pendingAdd.seifValue),
+    });
     setPendingAdd(null);
   }
 
@@ -164,6 +183,7 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
       text: freeText.value.trim(),
       sourceLabel: freeText.sourceLabel,
       note: freeText.note || undefined,
+      linkedSeif: parseSeifValue(freeText.seifValue),
     });
     setFreeText(null);
   }
@@ -177,6 +197,18 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
         dir="rtl"
       >
         <p className="text-xs text-gray-500 mb-2">{pendingAdd.params.sourceLabel}</p>
+        {canLinkToSeif(pendingAdd.params.sourceKey) && maxSeif && (
+          <select
+            value={pendingAdd.seifValue}
+            onChange={(e) => setPendingAdd((p) => p ? { ...p, seifValue: e.target.value } : p)}
+            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value="">סעיף בשו״ע (אופציונלי)</option>
+            {Array.from({ length: maxSeif }, (_, i) => (
+              <option key={i} value={i + 1}>סעיף {toHebrewNumeral(i + 1)}</option>
+            ))}
+          </select>
+        )}
         <input
           ref={noteInputRef}
           type="text"
@@ -223,6 +255,18 @@ export default function SelectionPopover({ onAdd, onDefineSource, texts }: Selec
           className="w-full text-sm border border-gray-200 rounded p-2 resize-y min-h-[80px] mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
           placeholder="הקלד טקסט..."
         />
+        {canLinkToSeif(freeText.sourceKey) && maxSeif && (
+          <select
+            value={freeText.seifValue}
+            onChange={(e) => setFreeText((prev) => prev ? { ...prev, seifValue: e.target.value } : prev)}
+            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 mb-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          >
+            <option value="">סעיף בשו״ע (אופציונלי)</option>
+            {Array.from({ length: maxSeif }, (_, i) => (
+              <option key={i} value={i + 1}>סעיף {toHebrewNumeral(i + 1)}</option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           value={freeText.note}

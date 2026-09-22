@@ -20,6 +20,8 @@ import { useDocumentAutosave } from "./useDocumentAutosave";
 import type { ManualEntryPayload } from "@/components/AddManualSourceModal";
 import SourceViewModal from "@/components/SourceViewModal";
 import { usePanelPrefs, DEFAULT_PANEL_HEIGHT } from "@/lib/panelPrefs";
+import type { HalachicBlock } from "@/lib/sefaria";
+import HalachicBlockView from "@/components/HalachicBlockView";
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -60,6 +62,7 @@ type TextsData = {
   magenAvraham: { ref: string; text: string[] } | null;
   beitShmuel: { ref: string; text: string[] } | null;
   meiratEinayim: { ref: string; text: string[] } | null;
+  seifBlocks: HalachicBlock[];
 };
 
 export type SourcePullContext = {
@@ -117,6 +120,8 @@ export default function SimanPage() {
   const {
     excerpts,
     expandedPanels,
+    viewMode,
+    setViewMode,
     addExcerpt,
     removeExcerpt,
     reorderExcerpts,
@@ -187,6 +192,7 @@ export default function SimanPage() {
       text: string;
       sourceLabel: string;
       note?: string;
+      linkedSeif?: number;
     }) => {
       // Direct "הוסף לדף" — adds to the doc AND creates a linked annotation so the
       // panel highlights the exact place the source was taken from.
@@ -198,6 +204,7 @@ export default function SimanPage() {
         text: params.text,
         sectionIndex: params.sectionIndex,
         note: params.note,
+        linkedSeif: params.linkedSeif,
       });
       fetch("/api/annotations", {
         method: "POST",
@@ -223,6 +230,30 @@ export default function SimanPage() {
         .catch(() => {});
     },
     [addExcerpt, chelek, number, currentUser, setExcerptAnnotationId]
+  );
+
+  // Clicking a Beit Yosef paragraph's own letter-label to pick its SA se'if —
+  // there's no reliable automatic mapping (unlike the mefarshim in
+  // HalachicBlock), so this is how the user builds it by hand as they study.
+  // Works on any paragraph, not just ones already pulled into the document.
+  const handleLinkBeitYosefSeif = useCallback(
+    (sectionIndex: number, seif: number | undefined) => {
+      const existing = excerpts.find((e) => e.sourceKey === "beitYosef" && e.sectionIndex === sectionIndex);
+      if (existing) {
+        updateExcerptFields(existing.id, { linkedSeif: seif });
+        return;
+      }
+      const html = texts?.beitYosef?.text[sectionIndex];
+      if (!html) return;
+      handleAdd({
+        sourceKey: "beitYosef",
+        sectionIndex,
+        text: html,
+        sourceLabel: buildSourceLabel("beitYosef", sectionIndex),
+        linkedSeif: seif,
+      });
+    },
+    [excerpts, texts, updateExcerptFields, handleAdd]
   );
 
   const handleAddManual = useCallback(
@@ -572,6 +603,9 @@ export default function SimanPage() {
         onAddHeading={addHeading}
         onUpdateHeading={updateHeading}
         onUpdateText={updateExcerptText}
+        onSetLinkedSeif={(id, seif) => updateExcerptFields(id, { linkedSeif: seif })}
+        onToggleHidden={(id, hidden) => updateExcerptFields(id, { hidden })}
+        maxSeif={texts?.shulchanArukh?.text.length}
         onAddManual={handleAddManual}
         onReset={reset}
       />
@@ -681,7 +715,29 @@ export default function SimanPage() {
                 </button>
               </div>
             )}
-            {texts && !loading && (() => {
+            {texts && !loading && (
+              <div className="flex items-center gap-3 mb-3 text-sm">
+                <button
+                  onClick={() => setViewMode("panels")}
+                  className={viewMode === "panels" ? "font-bold text-gray-900" : "text-gray-400 hover:text-gray-600"}
+                >
+                  כל המקורות
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  onClick={() => setViewMode("seifim")}
+                  className={viewMode === "seifim" ? "font-bold text-gray-900" : "text-gray-400 hover:text-gray-600"}
+                >
+                  לפי סעיפי שו״ע
+                </button>
+              </div>
+            )}
+
+            {viewMode === "seifim" && texts && !loading && (
+              <HalachicBlockView chelek={chelek} siman={number} blocks={texts.seifBlocks} linkedExcerpts={excerpts} />
+            )}
+
+            {viewMode === "panels" && texts && !loading && (() => {
               const relevantKeys = CHELEK_PANEL_KEYS[chelek] ?? SOURCE_ORDER.map((s) => s.key);
               const orderedPanels = panelPrefs.order
                 .filter((key) => relevantKeys.includes(key))
@@ -707,10 +763,19 @@ export default function SimanPage() {
                         currentUser={currentUser}
                         heightPx={heightPx}
                         onHeightChange={(px) => panelPrefs.setHeight(key, px)}
+                        draggable
                       />
                     ) : (() => {
-                      const data = (texts as Record<string, { ref: string; text: string[] } | null>)[key];
+                      const data = (texts as unknown as Record<string, { ref: string; text: string[] } | null>)[key];
                       const sections = data ? buildSections(key, data.text) : undefined;
+                      const isBeitYosef = key === "beitYosef";
+                      const linkedSeifBySection = isBeitYosef
+                        ? Object.fromEntries(
+                            excerpts
+                              .filter((e) => e.sourceKey === "beitYosef" && e.sectionIndex !== undefined && e.linkedSeif !== undefined)
+                              .map((e) => [e.sectionIndex as number, e.linkedSeif as number])
+                          )
+                        : undefined;
                       return (
                         <TextPanel
                           title={title}
@@ -722,8 +787,12 @@ export default function SimanPage() {
                           annotations={annotations.filter((a) => a.sourceKey === key)}
                           currentUser={currentUser}
                           onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
+                          maxSeif={isBeitYosef ? texts?.shulchanArukh?.text.length : undefined}
+                          linkedSeifBySection={linkedSeifBySection}
+                          onLinkSeif={isBeitYosef ? handleLinkBeitYosefSeif : undefined}
                           heightPx={heightPx}
                           onHeightChange={(px) => panelPrefs.setHeight(key, px)}
+                          draggable
                         />
                       );
                     })();
@@ -731,7 +800,6 @@ export default function SimanPage() {
                     return (
                       <div
                         key={key}
-                        draggable
                         onDragStart={(e) => {
                           panelDragKey.current = key;
                           e.dataTransfer.effectAllowed = "move";
@@ -757,7 +825,7 @@ export default function SimanPage() {
                           }
                         }}
                         onDragEnd={() => { updatePanelDropTarget(null); panelDragKey.current = null; }}
-                        className="cursor-grab active:cursor-grabbing"
+                        className="select-text"
                       >
                         {panelDropTarget === idx && panelDragKey.current !== key && (
                           <div className="h-0.5 bg-blue-500 rounded-full mb-1 shadow-sm" />
