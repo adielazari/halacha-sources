@@ -16,6 +16,7 @@ import { HeadingToolbar } from "@/components/HeadingToolbar";
 import type { HeadingAlign } from "@/components/HeadingToolbar";
 import { useUser } from "@/lib/userContext";
 import GroupSimanBanner from "@/components/GroupSimanBanner";
+import FontSettingsPanel from "@/components/FontSettingsPanel";
 import { useDocumentAutosave } from "./useDocumentAutosave";
 import type { ManualEntryPayload } from "@/components/AddManualSourceModal";
 import SourceViewModal from "@/components/SourceViewModal";
@@ -245,7 +246,13 @@ export default function SimanPage() {
       }
       const html = texts?.beitYosef?.text[sectionIndex];
       if (!html) return;
-      handleAdd({
+      // Just tags the paragraph — unlike handleAdd (used for an actual
+      // "select this text and pull it out" action), this doesn't create an
+      // annotation, so it doesn't trigger the panel's highlight styling.
+      // Linking a se'if is an organizing action, not a "this text matters"
+      // one.
+      addExcerpt({
+        id: crypto.randomUUID(),
         sourceKey: "beitYosef",
         sectionIndex,
         text: html,
@@ -253,7 +260,7 @@ export default function SimanPage() {
         linkedSeif: seif,
       });
     },
-    [excerpts, texts, updateExcerptFields, handleAdd]
+    [excerpts, texts, updateExcerptFields, addExcerpt]
   );
 
   const handleAddManual = useCallback(
@@ -648,6 +655,7 @@ export default function SimanPage() {
               {saveState === "saving" ? "שומר..." : saveState === "saved" ? "נשמר" : ""}
             </span>
             <GroupSimanBanner chelek={chelek} simanNumber={parseInt(number, 10)} />
+            <FontSettingsPanel />
           </div>
         </div>
 

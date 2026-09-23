@@ -29,12 +29,14 @@ interface FontSettings {
   fontFamily: FontFamily;
   fontSize: FontSize;
   lineHeight: LineHeight;
+  showNikud: boolean;
 }
 
 const DEFAULTS: FontSettings = {
   fontFamily: "Noto Serif Hebrew",
   fontSize:   "16px",
   lineHeight: "1.8",
+  showNikud:  true,
 };
 
 const STORAGE_KEY = "leket-font-settings";

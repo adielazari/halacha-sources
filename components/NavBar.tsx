@@ -43,7 +43,7 @@ export default function NavBar() {
                   ניהול
                 </Link>
               )}
-              <FontSettingsPanel />
+              <FontSettingsPanel dark />
               <span className="text-sm text-white/60 hidden sm:inline">
                 {session.user.name}
               </span>
