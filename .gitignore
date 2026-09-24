@@ -31,3 +31,6 @@ npm-debug.log*
 # Worktrees
 .worktrees/
 scripts/siman-headings.json
+
+# TypeScript incremental build
+*.tsbuildinfo
