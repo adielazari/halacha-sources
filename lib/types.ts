@@ -19,9 +19,11 @@ export type Excerpt = {
   imageData?: string;
   // Set when the excerpt is a source pulled from Sefaria via SourcePullView
   sourceRef?: string;
-  // Linked annotation ID — set when created via "הגדר מקור" (SourcePullView). Used to
-  // delete the panel highlight when this excerpt is removed from the document.
-  annotationId?: string;
+  // The panel text the user originally selected when pulling this source —
+  // the panel highlights it (lib/highlightSources.ts). Differs from `text`
+  // for Sefaria-pulled sources (text = the pulled source, highlightText =
+  // the mention in the Tur/Beit Yosef). Absent = no panel highlight.
+  highlightText?: string;
   commentaries?: CommentaryEntry[];
   parentId?: string;           // for answers: links to the parent question's id
   headingLevel?: 1 | 2 | 3;                   // for heading type: 1=large 2=medium 3=small
@@ -87,21 +89,3 @@ export type CollectionSiman = {
 };
 
 export type CollectionWithSimanim = Collection & { simanim: CollectionSiman[] };
-
-export type Annotation = {
-  id: string;
-  chelek: string;
-  siman: string;
-  sourceKey: string;
-  sourceLabel: string;
-  text: string;
-  sourceRef: string | null;
-  commentaries: CommentaryEntry[];
-  sectionIndex: number | null;
-  highlightText: string | null;
-  sectionHtml: string | null;
-  userName: string;
-  status: "pending" | "approved" | "rejected";
-  createdAt: string;
-  updatedAt: string;
-};
