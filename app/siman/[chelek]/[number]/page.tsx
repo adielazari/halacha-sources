@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "./store";
-import type { CommentaryEntry, Annotation } from "@/lib/types";
+import type { CommentaryEntry } from "@/lib/types";
 import TextPanel from "@/components/TextPanel";
 import SelectionPopover from "@/components/SelectionPopover";
 import SourceDocSidebar from "@/components/SourceDocSidebar";
@@ -70,7 +70,6 @@ export type SourcePullContext = {
   sectionIndex?: number;
   sectionHtml?: string;  // full section HTML for the collapsible reference view
   sectionLabel?: string; // label of that section e.g. "ב"י ס"ק ג׳"
-  annotation?: Annotation;
   /** Set when re-editing an existing excerpt — causes save to update in-place */
   excerptId?: string;
   /** Pre-load this Sefaria ref into SourcePullView (skips form phase) */
@@ -130,7 +129,6 @@ export default function SimanPage() {
     updateExcerptText,
     togglePanel,
     setSession,
-    setExcerptAnnotationId,
     updateExcerptFields,
     reset,
   } = useStore();
@@ -148,7 +146,6 @@ export default function SimanPage() {
   const [error, setError] = useState("");
   const [sourcePullContext, setSourcePullContext] = useState<SourcePullContext | null>(null);
   const [headingDialog, setHeadingDialog] = useState<HeadingDialogState>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [viewModal, setViewModal] = useState<ViewModalState>(null);
 
@@ -157,13 +154,6 @@ export default function SimanPage() {
   }, [chelek, number, setSession]);
 
   const saveState = useDocumentAutosave(chelek, number);
-
-  useEffect(() => {
-    fetch(`/api/annotations?chelek=${chelek}&siman=${number}&status=all`)
-      .then((r) => { if (!r.ok) return { annotations: [] }; return r.json(); })
-      .then((data: { annotations: Annotation[] }) => setAnnotations(data.annotations ?? []))
-      .catch(() => {/* silent */});
-  }, [chelek, number]);
 
   useEffect(() => {
     setLoading(true);
@@ -192,41 +182,19 @@ export default function SimanPage() {
       note?: string;
       linkedSeif?: number;
     }) => {
-      // Direct "הוסף לדף" — adds to the doc AND creates a linked annotation so the
-      // panel highlights the exact place the source was taken from.
-      const excerptId = crypto.randomUUID();
+      // Direct "הוסף לדף" — the selected panel text is both the excerpt and
+      // what the panel highlights (see lib/highlightSources.ts).
       addExcerpt({
-        id: excerptId,
         sourceKey: params.sourceKey,
         sourceLabel: params.sourceLabel,
         text: params.text,
         sectionIndex: params.sectionIndex,
         note: params.note,
         linkedSeif: params.linkedSeif,
+        highlightText: params.text,
       });
-      fetch("/api/annotations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chelek,
-          siman: number,
-          sourceKey: params.sourceKey,
-          sourceLabel: params.sourceLabel,
-          text: params.text,
-          highlightText: params.text,
-          sectionIndex: params.sectionIndex ?? null,
-        }),
-      })
-        .then((r) => r.json())
-        .then((data: { annotation?: Annotation }) => {
-          if (data.annotation) {
-            setAnnotations((prev) => [...prev, data.annotation!]);
-            setExcerptAnnotationId(excerptId, data.annotation.id);
-          }
-        })
-        .catch(() => {});
     },
-    [addExcerpt, chelek, number, setExcerptAnnotationId]
+    [addExcerpt]
   );
 
   // Clicking a Beit Yosef paragraph's own letter-label to pick its SA se'if —
@@ -243,8 +211,8 @@ export default function SimanPage() {
       const html = texts?.beitYosef?.text[sectionIndex];
       if (!html) return;
       // Just tags the paragraph — unlike handleAdd (used for an actual
-      // "select this text and pull it out" action), this doesn't create an
-      // annotation, so it doesn't trigger the panel's highlight styling.
+      // "select this text and pull it out" action), no highlightText, so the
+      // panel doesn't highlight it.
       // Linking a se'if is an organizing action, not a "this text matters"
       // one.
       addExcerpt({
@@ -281,103 +249,25 @@ export default function SimanPage() {
     [addExcerpt]
   );
 
-  // Backfill: excerpts added before this linking existed (or added while an
-  // earlier POST silently failed) have no annotationId — create one now so the
-  // panel highlights their origin too. Guarded so each excerpt is only tried once.
-  const backfilledIds = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const toBackfill = excerpts.filter(
-      (ex) =>
-        (ex.type ?? "source") === "source" &&
-        !ex.annotationId &&
-        ex.sourceKey &&
-        ex.sourceKey !== "heading" &&
-        !backfilledIds.current.has(ex.id)
-    );
-    if (toBackfill.length === 0) return;
-    toBackfill.forEach((ex) => backfilledIds.current.add(ex.id));
-
-    (async () => {
-      for (const ex of toBackfill) {
-        const highlightText = ex.text.replace(/<[^>]+>/g, "").trim();
-        if (!highlightText) continue;
-        try {
-          const res = await fetch("/api/annotations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chelek,
-              siman: number,
-              sourceKey: ex.sourceKey,
-              sourceLabel: ex.sourceLabel,
-              text: ex.text,
-              highlightText,
-              sectionIndex: ex.sectionIndex ?? null,
-            }),
-          });
-          const data: { annotation?: Annotation } = await res.json();
-          if (data.annotation) {
-            setAnnotations((prev) => [...prev, data.annotation!]);
-            setExcerptAnnotationId(ex.id, data.annotation.id);
-          }
-        } catch { /* silent — will retry next mount */ }
-      }
-    })();
-  }, [excerpts, chelek, number, setExcerptAnnotationId]);
-
-  // Repair: excerpts pulled via "הגדר מקור" never had sectionIndex copied onto
-  // the excerpt itself (only the linked annotation had it) — so the document's
-  // origin-section grouping/heading couldn't work. Backfill it from the annotation.
-  const sectionFixedIds = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (annotations.length === 0) return;
-    const toFix = excerpts.filter((ex) => {
-      if (sectionFixedIds.current.has(ex.id)) return false;
-      if (ex.sectionIndex !== undefined) return false;
-      if (!ex.annotationId) return false;
-      const ann = annotations.find((a) => a.id === ex.annotationId);
-      return ann?.sectionIndex !== null && ann?.sectionIndex !== undefined;
-    });
-    if (toFix.length === 0) return;
-    toFix.forEach((ex) => {
-      sectionFixedIds.current.add(ex.id);
-      const ann = annotations.find((a) => a.id === ex.annotationId)!;
-      updateExcerptFields(ex.id, { sectionIndex: ann.sectionIndex! });
-    });
-  }, [excerpts, annotations, updateExcerptFields]);
-
-  // Remove excerpt + delete its panel highlight annotation (if any)
-  const handleRemoveExcerpt = useCallback(
-    (id: string) => {
-      const excerpt = excerpts.find((e) => e.id === id);
-      removeExcerpt(id);
-      if (excerpt?.annotationId) {
-        fetch(`/api/annotations/${excerpt.annotationId}`, { method: "DELETE" }).catch(() => {});
-        setAnnotations((prev) => prev.filter((a) => a.id !== excerpt.annotationId));
-      }
-    },
-    [excerpts, removeExcerpt]
-  );
+  // Removing an excerpt also removes its panel highlight — both live on the excerpt.
+  const handleRemoveExcerpt = removeExcerpt;
 
   // Open SourcePullView to re-edit an existing excerpt
   const handleEditExcerpt = useCallback(
     (excerptId: string) => {
       const excerpt = excerpts.find((e) => e.id === excerptId);
       if (!excerpt) return;
-      // If linked to an annotation, use it (includes sourceRef for auto-fetch)
-      const ann = excerpt.annotationId
-        ? annotations.find((a) => a.id === excerpt.annotationId)
-        : undefined;
       setSourcePullContext({
-        text: excerpt.text.replace(/<[^>]+>/g, "").slice(0, 300),
+        // The highlighted mention (e.g. "נדרים (י.)") detects the source
+        // better than the pulled text itself.
+        text: excerpt.highlightText ?? excerpt.text.replace(/<[^>]+>/g, "").slice(0, 300),
         sourceKey: excerpt.sourceKey,
         sectionIndex: excerpt.sectionIndex,
-        annotation: ann,
-        preloadRef: ann ? undefined : excerpt.sourceRef,
+        preloadRef: excerpt.sourceRef,
         excerptId,
       });
     },
-    [excerpts, annotations]
+    [excerpts]
   );
 
   // Sidebar "view" — show the excerpt exactly as it was pulled into the
@@ -416,123 +306,34 @@ export default function SimanPage() {
       commentaries?: CommentaryEntry[];
     }) => {
       const panelSnippet = sourcePullContext?.text ?? "";
-      const panelSectionIndex = sourcePullContext?.sectionIndex ?? null;
-      const existingAnnotation = sourcePullContext?.annotation;
+      const panelSectionIndex = sourcePullContext?.sectionIndex;
       const editingExcerptId = sourcePullContext?.excerptId;
 
       if (editingExcerptId) {
-        // Re-editing an existing excerpt — update in place
+        // Re-editing an existing excerpt — update in place, its highlight stays.
         updateExcerptFields(editingExcerptId, {
           text: params.text,
           sourceLabel: params.sourceLabel,
           sourceRef: params.sourceRef,
           commentaries: params.commentaries,
-          sectionIndex: panelSectionIndex ?? undefined,
+          sectionIndex: panelSectionIndex,
         });
-        // Also PATCH the linked annotation if there is one
-        if (existingAnnotation) {
-          fetch(`/api/annotations/${existingAnnotation.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: params.text,
-              sourceLabel: params.sourceLabel,
-              sourceRef: params.sourceRef ?? null,
-              commentaries: params.commentaries ?? [],
-            }),
-          })
-            .then((r) => r.json())
-            .then((data: { annotation?: Annotation }) => {
-              if (data.annotation) {
-                setAnnotations((prev) =>
-                  prev.map((a) => (a.id === existingAnnotation.id ? data.annotation! : a))
-                );
-              }
-            })
-            .catch(() => {});
-        }
-      } else if (existingAnnotation) {
-        // From mark click — if the excerpt was deleted (race condition or explicit remove),
-        // re-add it so the source reappears in the sidebar.
-        const linkedExcerpt = excerpts.find((e) => e.annotationId === existingAnnotation.id);
-        if (!linkedExcerpt) {
-          const newId = crypto.randomUUID();
-          addExcerpt({
-            id: newId,
-            sourceKey: params.sourceKey,
-            sourceLabel: params.sourceLabel,
-            text: params.text,
-            sourceRef: params.sourceRef,
-            commentaries: params.commentaries,
-            sectionIndex: panelSectionIndex ?? undefined,
-          });
-          setExcerptAnnotationId(newId, existingAnnotation.id);
-        }
-        // PATCH the annotation regardless
-        fetch(`/api/annotations/${existingAnnotation.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: params.text,
-            sourceLabel: params.sourceLabel,
-            highlightText: panelSnippet ? decodeHtml(panelSnippet.replace(/<[^>]+>/g, "")) : null,
-            sectionIndex: panelSectionIndex,
-            sectionHtml: sourcePullContext?.sectionHtml ?? null,
-            sourceRef: params.sourceRef ?? null,
-            commentaries: params.commentaries ?? [],
-          }),
-        })
-          .then((r) => r.json())
-          .then((data: { annotation?: Annotation }) => {
-            if (data.annotation) {
-              setAnnotations((prev) =>
-                prev.map((a) => (a.id === existingAnnotation.id ? data.annotation! : a))
-              );
-            }
-          })
-          .catch(() => {});
       } else {
-        // New annotation — pre-generate ID so we can link excerpt ↔ annotation
-        const excerptId = crypto.randomUUID();
         addExcerpt({
-          id: excerptId,
           sourceKey: params.sourceKey,
           sourceLabel: params.sourceLabel,
           text: params.text,
           sourceRef: params.sourceRef,
           commentaries: params.commentaries,
-          sectionIndex: panelSectionIndex ?? undefined,
+          sectionIndex: panelSectionIndex,
+          // The panel snippet the user originally selected — NOT params.text
+          // (the pulled Sefaria source, which can't match the panel HTML).
+          highlightText: panelSnippet ? decodeHtml(panelSnippet.replace(/<[^>]+>/g, "")) : undefined,
         });
-        fetch("/api/annotations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chelek,
-            siman: number,
-            sourceKey: params.sourceKey,
-            sourceLabel: params.sourceLabel,
-            text: params.text,
-            // highlightText = the panel snippet the user originally selected,
-            // NOT params.text (the pulled Sefaria source, which can't match panel HTML).
-            highlightText: panelSnippet ? decodeHtml(panelSnippet.replace(/<[^>]+>/g, "")) : null,
-            sectionIndex: panelSectionIndex,
-            sectionHtml: sourcePullContext?.sectionHtml ?? null,
-            sourceRef: params.sourceRef ?? null,
-            commentaries: params.commentaries ?? [],
-          }),
-        })
-          .then((r) => r.json())
-          .then((data: { annotation?: Annotation }) => {
-            if (data.annotation) {
-              setAnnotations((prev) => [...prev, data.annotation!]);
-              setExcerptAnnotationId(excerptId, data.annotation.id);
-            }
-          })
-          .catch(() => {});
       }
       setSourcePullContext(null);
     },
-    [addExcerpt, updateExcerptFields, setExcerptAnnotationId, excerpts, chelek, number, sourcePullContext]
+    [addExcerpt, updateExcerptFields, sourcePullContext]
   );
 
   // Click on a highlighted <mark> → open a read-only view popup showing the
@@ -541,31 +342,11 @@ export default function SimanPage() {
   const handleMarkClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
-      const mark = target.closest("mark[data-annotation-id]");
-      if (!mark) return;
-      const annId = mark.getAttribute("data-annotation-id");
-      if (!annId) return;
-      const ann = annotations.find((a) => a.id === annId);
-      if (!ann) return;
-      const linkedExcerpt = excerpts.find((ex) => ex.annotationId === annId);
-      setViewModal({
-        title: linkedExcerpt?.sourceLabel ?? ann.sourceLabel,
-        html: linkedExcerpt?.text ?? ann.text ?? ann.highlightText ?? "",
-        commentaries: linkedExcerpt?.commentaries ?? ann.commentaries,
-        note: linkedExcerpt?.note,
-        onEdit: () => {
-          setViewModal(null);
-          setSourcePullContext({
-            text: ann.highlightText ?? "",
-            sourceKey: ann.sourceKey,
-            sectionIndex: ann.sectionIndex ?? undefined,
-            sectionHtml: ann.sectionHtml ?? undefined,
-            annotation: ann,
-          });
-        },
-      });
+      const mark = target.closest("mark[data-excerpt-id]");
+      const excerptId = mark?.getAttribute("data-excerpt-id");
+      if (excerptId) handleViewOrigin(excerptId);
     },
-    [annotations, excerpts]
+    [handleViewOrigin]
   );
 
   // Section label clicked in SA panel → open heading dialog
@@ -760,7 +541,7 @@ export default function SimanPage() {
                         expanded={expanded}
                         onToggle={() => togglePanel(key)}
                         html={texts.tur?.text ?? ""}
-                        annotations={annotations.filter((a) => a.sourceKey === key)}
+                        highlights={excerpts}
                         heightPx={heightPx}
                         onHeightChange={(px) => panelPrefs.setHeight(key, px)}
                         draggable
@@ -784,7 +565,7 @@ export default function SimanPage() {
                           expanded={expanded}
                           onToggle={() => togglePanel(key)}
                           sections={sections}
-                          annotations={annotations.filter((a) => a.sourceKey === key)}
+                          highlights={excerpts}
                           onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
                           maxSeif={isBeitYosef ? texts?.shulchanArukh?.text.length : undefined}
                           linkedSeifBySection={linkedSeifBySection}

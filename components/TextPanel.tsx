@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Annotation } from "@/lib/types";
-import { highlightAnnotations } from "@/lib/highlightAnnotations";
+import type { Excerpt } from "@/lib/types";
+import { highlightSources } from "@/lib/highlightSources";
 import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import { stripNikud } from "@/lib/nikud";
 import { useFontSettings } from "@/lib/fontSettings";
@@ -21,7 +21,7 @@ interface TextPanelProps {
   onToggle: () => void;
   sections?: Section[];
   html?: string;
-  annotations?: Annotation[];
+  highlights?: Excerpt[];
   onSectionClick?: (sourceKey: string, sectionIndex: number, label: string) => void;
   heightPx?: number;
   onHeightChange?: (px: number) => void;
@@ -46,7 +46,7 @@ export default function TextPanel({
   onToggle,
   sections,
   html,
-  annotations,
+  highlights,
   onSectionClick,
   heightPx,
   onHeightChange,
@@ -113,7 +113,7 @@ export default function TextPanel({
               style={{ fontSize: "var(--app-font-size, 16px)", lineHeight: "var(--app-line-height, 1.8)" }}
               dir="rtl"
               dangerouslySetInnerHTML={{
-                __html: renderText(highlightAnnotations(html, annotations ?? [], sourceKey)),
+                __html: renderText(highlightSources(html, highlights ?? [], sourceKey)),
               }}
             />
           ) : sections && sections.length > 0 ? (
@@ -183,9 +183,9 @@ export default function TextPanel({
                     )}
                     <span
                       dangerouslySetInnerHTML={{
-                        __html: renderText(highlightAnnotations(
+                        __html: renderText(highlightSources(
                           sec.html,
-                          annotations ?? [],
+                          highlights ?? [],
                           sourceKey,
                           sec.index
                         )),

@@ -157,7 +157,6 @@ function rishonChapterLabel(rishonHe: string, tractateEn: string, ch: number): s
 
 export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
-  const [annotationDismissed, setAnnotationDismissed] = useState(false);
 
   // ── Form ──
   const [sourceType, setSourceType] = useState<SourceType>("gemara");
@@ -321,9 +320,9 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
     }
   }, [context.text]);
 
-  // Pre-load from annotation.sourceRef or context.preloadRef if available
+  // Pre-load context.preloadRef (the excerpt's saved Sefaria ref) if available
   useEffect(() => {
-    const ref = context.annotation?.sourceRef ?? context.preloadRef;
+    const ref = context.preloadRef;
     if (!ref || phase !== "form") return;
     (async () => {
       setLoadingPull(true);
@@ -408,7 +407,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       } catch { /* silent — user can fill form manually */ }
       finally { setLoadingPull(false); }
     })();
-  }, [context.annotation?.sourceRef, context.preloadRef]); // re-run when ref changes
+  }, [context.preloadRef]); // re-run when ref changes
 
   // Track text selection in source area and commentary editing area
   useEffect(() => {
@@ -1058,7 +1057,6 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   // ── Render ──
 
   const showNav = phase === "selecting" && currentMode !== "";
-  const ann = context.annotation;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -1089,32 +1087,6 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
               dangerouslySetInnerHTML={{ __html: context.sectionHtml }}
             />
           )}
-        </div>
-      )}
-
-      {/* Annotation banner — only for approved / rejected */}
-      {ann && !annotationDismissed && ann.status !== "pending" && (
-        <div
-          className={`border rounded-lg p-3 flex items-center justify-between ${
-            ann.status === "approved"
-              ? "bg-green-50 border-green-300"
-              : "bg-red-50 border-red-300"
-          }`}
-          dir="rtl"
-        >
-          <span className={`text-sm font-medium ${ann.status === "approved" ? "text-green-800" : "text-red-800"}`}>
-            {ann.status === "approved" ? "מקור מאושר" : "מקור שנדחה"} — עריכה ושמירה יעדכנו את הרשומה
-          </span>
-          <button
-            type="button"
-            onClick={() => setAnnotationDismissed(true)}
-            className={`text-lg font-bold leading-none mr-3 ${
-              ann.status === "approved" ? "text-green-700 hover:text-green-900" : "text-red-700 hover:text-red-900"
-            }`}
-            title="סגור"
-          >
-            ✕
-          </button>
         </div>
       )}
 
@@ -1809,7 +1781,7 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
               </button>
             )}
             <button onClick={() => handleAddToDoc(false)} className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-semibold py-2 px-4 rounded-lg transition">
-              {context.annotation ? "שמור שינויים ←" : "הוסף לדף מקורות ←"}
+              {context.excerptId ? "שמור שינויים ←" : "הוסף לדף מקורות ←"}
             </button>
           </div>
         </div>

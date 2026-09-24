@@ -1,10 +1,11 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import type { AgentDefinition, AgentLanguage, Annotation, Collection, CollectionSiman, CollectionWithSimanim, CommentaryEntry, Excerpt, OrgMode, PracticalPoint } from "./types";
+import { migrateAnnotationsToDocuments } from "./migrateAnnotations";
+import type { AgentDefinition, AgentLanguage, Collection, CollectionSiman, CollectionWithSimanim, Excerpt, OrgMode, PracticalPoint } from "./types";
 
 // Increment this whenever the schema changes — forces re-run after HMR reloads
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const SEED_PRACTICAL_POINTS_PROMPT =
   "אתה עוזר הלכתי. קיבלת את הטקסטים ההלכתיים הגולמיים של הסימן (טור, בית יוסף, שולחן ערוך, ט\"ז, ש\"ך, פתחי תשובה) וכן את קטעי המקורות שהמשתמש כבר בחר ותקצר בעצמו עבור סימן זה. " +
@@ -52,25 +53,6 @@ function applySchema(db: Database.Database) {
       UNIQUE(collection_id, chelek, siman_number)
     );
     CREATE INDEX IF NOT EXISTS idx_coll_simanim ON collection_simanim(collection_id);
-
-    CREATE TABLE IF NOT EXISTS annotations (
-      id             TEXT PRIMARY KEY,
-      chelek         TEXT NOT NULL,
-      siman          TEXT NOT NULL,
-      source_key     TEXT NOT NULL,
-      source_label   TEXT NOT NULL,
-      text           TEXT NOT NULL DEFAULT '',
-      source_ref     TEXT,
-      commentaries   TEXT DEFAULT '[]',
-      section_index  INTEGER,
-      highlight_text TEXT,
-      section_html   TEXT,
-      user_name      TEXT DEFAULT 'anonymous',
-      status         TEXT NOT NULL DEFAULT 'pending',
-      created_at     TEXT DEFAULT (datetime('now')),
-      updated_at     TEXT DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_annotations_siman ON annotations(chelek, siman);
 
     CREATE TABLE IF NOT EXISTS documents (
       id         TEXT PRIMARY KEY,
@@ -121,14 +103,13 @@ function applySchema(db: Database.Database) {
     insertAgent.run(crypto.randomUUID(), "תובנות טכנולוגיות ויישומיות", "claude-fable-5", SEED_TECH_INSIGHTS_PROMPT, "he");
   }
 
-  // ── Column migrations ────────────────────────────────────────────────────
-  const annCols = db.pragma("table_info(annotations)") as { name: string }[];
-  if (!annCols.some((c) => c.name === "user_id")) db.exec("ALTER TABLE annotations ADD COLUMN user_id TEXT");
-  if (!annCols.some((c) => c.name === "status")) {
-    db.exec("ALTER TABLE annotations ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
-    const hasApproved = annCols.some((c) => c.name === "approved");
-    if (hasApproved) db.exec("UPDATE annotations SET status = CASE WHEN approved = 1 THEN 'approved' ELSE 'pending' END");
-  }
+  // ── Panel highlights: annotations table → Excerpt.highlightText (one-time) ──
+  // The local profile is resolved here directly (not via getPrimaryUser,
+  // which would re-enter getDb).
+  const primary = db
+    .prepare("SELECT id FROM users ORDER BY (role = 'admin') DESC, created_at ASC LIMIT 1")
+    .get() as { id: string } | undefined;
+  migrateAnnotationsToDocuments(db, primary?.id ?? null);
 }
 
 function getDb(): Database.Database {
@@ -146,149 +127,6 @@ function getDb(): Database.Database {
     globalForDb.__dbSchemaVersion = SCHEMA_VERSION;
   }
   return globalForDb.__db;
-}
-
-type DbRow = {
-  id: string;
-  chelek: string;
-  siman: string;
-  source_key: string;
-  source_label: string;
-  text: string;
-  source_ref: string | null;
-  commentaries: string;
-  section_index: number | null;
-  highlight_text: string | null;
-  section_html: string | null;
-  user_name: string;
-  user_id: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-};
-
-function rowToAnnotation(row: DbRow): Annotation {
-  let commentaries: CommentaryEntry[] = [];
-  try { commentaries = JSON.parse(row.commentaries) as CommentaryEntry[]; } catch { /* empty */ }
-  const status = (["pending", "approved", "rejected"].includes(row.status)
-    ? row.status
-    : "pending") as Annotation["status"];
-  return {
-    id: row.id,
-    chelek: row.chelek,
-    siman: row.siman,
-    sourceKey: row.source_key,
-    sourceLabel: row.source_label,
-    text: row.text,
-    sourceRef: row.source_ref,
-    commentaries,
-    sectionIndex: row.section_index,
-    highlightText: row.highlight_text,
-    sectionHtml: row.section_html,
-    userName: row.user_name,
-    status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-export function getAllAnnotations(
-  chelek: string,
-  siman: string,
-  status?: string
-): Annotation[] {
-  const db = getDb();
-  let query = "SELECT * FROM annotations WHERE chelek = ? AND siman = ?";
-  const params: unknown[] = [chelek, siman];
-  if (status && status !== "all") {
-    query += " AND status = ?";
-    params.push(status);
-  }
-  query += " ORDER BY created_at ASC";
-  const rows = db.prepare(query).all(...params) as DbRow[];
-  return rows.map(rowToAnnotation);
-}
-
-export function getAnnotation(id: string): Annotation | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM annotations WHERE id = ?").get(id) as DbRow | undefined;
-  return row ? rowToAnnotation(row) : null;
-}
-
-export type CreateAnnotationData = {
-  id: string;
-  chelek: string;
-  siman: string;
-  sourceKey: string;
-  sourceLabel: string;
-  text?: string;
-  sourceRef?: string | null;
-  commentaries?: CommentaryEntry[];
-  sectionIndex?: number | null;
-  highlightText?: string | null;
-  sectionHtml?: string | null;
-  userName?: string;
-  userId?: string | null;
-  status?: "pending" | "approved" | "rejected";
-};
-
-export function createAnnotation(data: CreateAnnotationData): Annotation {
-  const db = getDb();
-  db.prepare(`
-    INSERT INTO annotations
-      (id, chelek, siman, source_key, source_label, text, source_ref,
-       commentaries, section_index, highlight_text, section_html, user_name, user_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    data.id, data.chelek, data.siman, data.sourceKey, data.sourceLabel,
-    data.text ?? "", data.sourceRef ?? null,
-    JSON.stringify(data.commentaries ?? []),
-    data.sectionIndex ?? null, data.highlightText ?? null, data.sectionHtml ?? null,
-    data.userName ?? "anonymous", data.userId ?? null, data.status ?? "pending",
-  );
-  return getAnnotation(data.id)!;
-}
-
-export type UpdateAnnotationData = Partial<{
-  sourceLabel: string;
-  text: string;
-  sourceRef: string | null;
-  commentaries: CommentaryEntry[];
-  sectionIndex: number | null;
-  highlightText: string | null;
-  sectionHtml: string | null;
-  userName: string;
-  status: "pending" | "approved" | "rejected";
-}>;
-
-export function updateAnnotation(id: string, data: UpdateAnnotationData): Annotation | null {
-  const db = getDb();
-  const fields: string[] = [];
-  const values: unknown[] = [];
-
-  if (data.sourceLabel !== undefined) { fields.push("source_label = ?"); values.push(data.sourceLabel); }
-  if (data.text !== undefined) { fields.push("text = ?"); values.push(data.text); }
-  if (data.sourceRef !== undefined) { fields.push("source_ref = ?"); values.push(data.sourceRef); }
-  if (data.commentaries !== undefined) { fields.push("commentaries = ?"); values.push(JSON.stringify(data.commentaries)); }
-  if (data.sectionIndex !== undefined) { fields.push("section_index = ?"); values.push(data.sectionIndex); }
-  if (data.highlightText !== undefined) { fields.push("highlight_text = ?"); values.push(data.highlightText); }
-  if (data.sectionHtml !== undefined) { fields.push("section_html = ?"); values.push(data.sectionHtml); }
-  if (data.userName !== undefined) { fields.push("user_name = ?"); values.push(data.userName); }
-  if (data.status !== undefined) { fields.push("status = ?"); values.push(data.status); }
-
-  if (fields.length === 0) return getAnnotation(id);
-
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  db.prepare(`UPDATE annotations SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-  return getAnnotation(id);
-}
-
-export function deleteAnnotation(id: string): boolean {
-  const db = getDb();
-  const result = db.prepare("DELETE FROM annotations WHERE id = ?").run(id);
-  return result.changes > 0;
 }
 
 // ── Documents (per-siman personal study document / "summary") ──────────────────
@@ -632,10 +470,4 @@ export function reorderCollectionSimanim(collectionId: string, orderedIds: strin
     db.prepare("UPDATE collections SET updated_at = datetime('now') WHERE id = ?").run(collectionId);
   });
   tx();
-}
-
-export function getAnnotationCountsByChelek(chelek: string): { siman: string; count: number }[] {
-  const db = getDb();
-  const rows = db.prepare("SELECT siman, COUNT(*) as count FROM annotations WHERE chelek = ? AND status = 'approved' GROUP BY siman ORDER BY count DESC").all(chelek) as { siman: string; count: number }[];
-  return rows;
 }

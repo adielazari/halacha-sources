@@ -27,7 +27,6 @@ type Store = {
   setViewMode(mode: ViewMode): void;
 
   addExcerpt(excerpt: Omit<Excerpt, "id"> & { id?: string }): void;
-  setExcerptAnnotationId(excerptId: string, annotationId: string): void;
   removeExcerpt(id: string): void;
   reorderExcerpts(fromIndex: number, toIndex: number): void;
   updateNote(id: string, note: string): void;
@@ -59,13 +58,6 @@ export const useStore = create<Store>()(
             ...state.excerpts,
             { ...excerpt, id: excerpt.id ?? crypto.randomUUID() },
           ],
-        })),
-
-      setExcerptAnnotationId: (excerptId, annotationId) =>
-        set((state) => ({
-          excerpts: state.excerpts.map((e) =>
-            e.id === excerptId ? { ...e, annotationId } : e
-          ),
         })),
 
       removeExcerpt: (id) =>
