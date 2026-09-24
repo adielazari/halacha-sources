@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Annotation } from "@/lib/types";
 import { highlightAnnotations } from "@/lib/highlightAnnotations";
 import { toHebrewNumeral } from "@/lib/hebrewNumerals";
+import { stripNikud } from "@/lib/nikud";
+import { useFontSettings } from "@/lib/fontSettings";
 
 interface Section {
   index: number;
@@ -54,6 +56,8 @@ export default function TextPanel({
   onLinkSeif,
 }: TextPanelProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const { showNikud } = useFontSettings();
+  const renderText = (h: string) => (showNikud ? h : stripNikud(h));
   const [seifPickerOpen, setSeifPickerOpen] = useState<number | null>(null);
 
   // Feed the native CSS resize-handle drag back into the persisted preference.
@@ -105,10 +109,11 @@ export default function TextPanel({
           {html !== undefined ? (
             <div
               data-source-key={sourceKey}
-              className="text-sm leading-loose text-gray-800"
+              className="text-gray-800"
+              style={{ fontSize: "var(--app-font-size, 16px)", lineHeight: "var(--app-line-height, 1.8)" }}
               dir="rtl"
               dangerouslySetInnerHTML={{
-                __html: highlightAnnotations(html, annotations ?? [], sourceKey),
+                __html: renderText(highlightAnnotations(html, annotations ?? [], sourceKey)),
               }}
             />
           ) : sections && sections.length > 0 ? (
@@ -121,7 +126,8 @@ export default function TextPanel({
                   <div
                     data-source-key={sourceKey}
                     data-section-index={sec.index}
-                    className="text-sm leading-loose text-gray-800"
+                    className="text-gray-800"
+                    style={{ fontSize: "var(--app-font-size, 16px)", lineHeight: "var(--app-line-height, 1.8)" }}
                     dir="rtl"
                   >
                     {sec.label && (
@@ -177,12 +183,12 @@ export default function TextPanel({
                     )}
                     <span
                       dangerouslySetInnerHTML={{
-                        __html: highlightAnnotations(
+                        __html: renderText(highlightAnnotations(
                           sec.html,
                           annotations ?? [],
                           sourceKey,
                           sec.index
-                        ),
+                        )),
                       }}
                     />
                   </div>

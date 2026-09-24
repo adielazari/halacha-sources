@@ -5,6 +5,7 @@ import type { Excerpt, DocItemType } from "@/lib/types";
 import { getHex, AUTO_MATCHED_SEIF_SOURCE_KEYS, isExcerptHidden } from "@/lib/sourceLabels";
 import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import { HeadingToolbar } from "./HeadingToolbar";
+import { ClosedEyeIcon } from "./EyeIcon";
 import type { HeadingAlign } from "./HeadingToolbar";
 
 type DragHandlers = {
@@ -322,7 +323,7 @@ export default function ExcerptCard({
                 aria-label={hidden ? "הצג בדף הסופי" : "הסתר מהדף הסופי"}
                 title={hidden ? "מוסתר מהדף הסופי — לחץ להצגה" : "מוצג בדף הסופי — לחץ להסתרה"}
               >
-                {hidden ? "🙈" : "👁"}
+                {hidden ? <ClosedEyeIcon /> : "👁"}
               </button>
             )}
             <div className="w-full border-t border-gray-100 my-0.5" />

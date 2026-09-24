@@ -3,16 +3,18 @@
 import { useState } from "react";
 import { useFontSettings, FONTS, SIZES, LINE_HEIGHTS } from "@/lib/fontSettings";
 
-export default function FontSettingsPanel() {
+export default function FontSettingsPanel({ dark }: { dark?: boolean }) {
   const [open, setOpen] = useState(false);
-  const { fontFamily, fontSize, lineHeight, set } = useFontSettings();
+  const { fontFamily, fontSize, lineHeight, showNikud, set } = useFontSettings();
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="text-white/70 hover:text-leket-gold transition text-base leading-none"
-        title="הגדרות תצוגה"
+        className={dark
+          ? "text-white/70 hover:text-leket-gold transition text-base leading-none"
+          : "text-gray-500 hover:text-gray-700 transition text-base leading-none"}
+        title="הגדרות תצוגה — גודל טקסט המקורות"
         aria-label="הגדרות תצוגה"
       >
         ⚙️
@@ -85,6 +87,33 @@ export default function FontSettingsPanel() {
                     {lh.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Nikud */}
+            <div className="mt-4">
+              <p className="text-xs text-leket-muted mb-1.5">ניקוד</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => set({ showNikud: true })}
+                  className={`flex-1 py-1.5 rounded-lg text-xs transition ${
+                    showNikud
+                      ? "bg-leket-navy text-white"
+                      : "bg-leket-parchment hover:bg-leket-border text-leket-navy"
+                  }`}
+                >
+                  עם ניקוד
+                </button>
+                <button
+                  onClick={() => set({ showNikud: false })}
+                  className={`flex-1 py-1.5 rounded-lg text-xs transition ${
+                    !showNikud
+                      ? "bg-leket-navy text-white"
+                      : "bg-leket-parchment hover:bg-leket-border text-leket-navy"
+                  }`}
+                >
+                  בלי ניקוד
+                </button>
               </div>
             </div>
           </div>

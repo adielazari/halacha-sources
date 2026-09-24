@@ -10,6 +10,7 @@ import { groupExcerpts } from "@/lib/groupExcerpts";
 import { AUTO_MATCHED_SEIF_SOURCE_KEYS, isExcerptHidden } from "@/lib/sourceLabels";
 import SourceViewModal from "@/components/SourceViewModal";
 import BlockAnalysisPanel from "@/components/BlockAnalysisPanel";
+import { ClosedEyeIcon } from "@/components/EyeIcon";
 
 type AgentSummary = { id: string; name: string };
 
@@ -150,7 +151,7 @@ function ExcerptItem({ ex, num, nested, onView, onSetLinkedSeif, onToggleHidden,
             className="no-print text-xs text-gray-400 hover:text-blue-600 transition mr-auto"
             title="הסתר מהדף הסופי"
           >
-            🙈 הסתר
+            <ClosedEyeIcon /> הסתר
           </button>
         )}
       </div>

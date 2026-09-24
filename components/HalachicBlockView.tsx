@@ -6,6 +6,8 @@ import type { BlockAnalysisRow } from "@/lib/db";
 import type { Excerpt } from "@/lib/types";
 import { SOURCE_LABELS, getHex } from "@/lib/sourceLabels";
 import { toHebrewNumeral } from "@/lib/hebrewNumerals";
+import { stripNikud } from "@/lib/nikud";
+import { useFontSettings } from "@/lib/fontSettings";
 import SeifBlockAnalysis from "./SeifBlockAnalysis";
 
 type Props = {
@@ -46,6 +48,9 @@ function simpleHash(str: string): string {
 // HalachicBlock (SA se'if + its mefaresh notes) at a time, in contrast to
 // the "כל המקורות" panel mode which stays completely untouched.
 export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpts }: Props) {
+  const { showNikud } = useFontSettings();
+  const renderText = (h: string) => (showNikud ? h : stripNikud(h));
+  const textStyle = { fontSize: "var(--app-font-size, 16px)", lineHeight: "var(--app-line-height, 1.8)" };
   const [storedByIndex, setStoredByIndex] = useState<Record<number, BlockAnalysisRow>>({});
   // SeifBlockAnalysis only reads `initialStored` once, at mount — so we wait
   // for this (fast, local) fetch before mounting it, rather than risk it
@@ -76,11 +81,11 @@ export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpt
         const linkedForBlock = linkedExcerpts.filter((e) => e.linkedSeif === block.seifIndex);
 
         const commentariesForAnalysis = [
-          ...block.notes.map((n) => ({ heRef: n.sourceLabel, text: n.html })),
           ...linkedForBlock.flatMap((e) => [
             { heRef: e.sourceLabel, text: e.text },
             ...(e.commentaries ?? []).map((c) => ({ heRef: c.heRef, text: c.text })),
           ]),
+          ...block.notes.map((n) => ({ heRef: n.sourceLabel, text: n.html })),
         ];
 
         const effectiveHash = linkedForBlock.length === 0
@@ -95,13 +100,36 @@ export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpt
               סעיף {toHebrewNumeral(block.seifIndex + 1)}
             </p>
 
+            {/* Tur/Beit Yosef (manually linked) come first — matching the
+                traditional order: background/reasoning before the SA's
+                final ruling and the later commentators on it. */}
+            {linkedForBlock.map((e) => (
+              <div key={e.id} className="mb-3">
+                <p className="text-xs font-semibold mb-1" style={{ color: getHex(e.sourceKey) }}>
+                  {SOURCE_LABELS[e.sourceKey] ?? e.sourceLabel}
+                </p>
+                <div className="text-gray-700" style={textStyle} dangerouslySetInnerHTML={{ __html: renderText(e.text) }} />
+                {e.commentaries && e.commentaries.length > 0 && (
+                  <div className="mt-1 pr-3 border-r-2 border-amber-200 space-y-1">
+                    {e.commentaries.map((c) => (
+                      <div key={c.ref}>
+                        <p className="text-xs font-semibold text-amber-800">{c.heRef}</p>
+                        <p className="text-xs text-gray-600">{c.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
             <div className="mb-3">
               <p className="text-xs font-semibold mb-1" style={{ color: getHex("shulchanArukh") }}>
                 {SOURCE_LABELS.shulchanArukh}
               </p>
               <div
-                className="text-[15px] leading-loose text-gray-800"
-                dangerouslySetInnerHTML={{ __html: block.saHtml }}
+                className="text-gray-800"
+                style={textStyle}
+                dangerouslySetInnerHTML={{ __html: renderText(block.saHtml) }}
               />
             </div>
 
@@ -114,30 +142,12 @@ export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpt
                   {group.items.map((note) => (
                     <div
                       key={`${note.sourceKey}-${note.noteIndex}`}
-                      className="text-sm leading-loose text-gray-700"
-                      dangerouslySetInnerHTML={{ __html: note.html }}
+                      className="text-gray-700"
+                      style={textStyle}
+                      dangerouslySetInnerHTML={{ __html: renderText(note.html) }}
                     />
                   ))}
                 </div>
-              </div>
-            ))}
-
-            {linkedForBlock.map((e) => (
-              <div key={e.id} className="mb-3">
-                <p className="text-xs font-semibold mb-1" style={{ color: getHex(e.sourceKey) }}>
-                  {SOURCE_LABELS[e.sourceKey] ?? e.sourceLabel}
-                </p>
-                <div className="text-sm leading-loose text-gray-700" dangerouslySetInnerHTML={{ __html: e.text }} />
-                {e.commentaries && e.commentaries.length > 0 && (
-                  <div className="mt-1 pr-3 border-r-2 border-amber-200 space-y-1">
-                    {e.commentaries.map((c) => (
-                      <div key={c.ref}>
-                        <p className="text-xs font-semibold text-amber-800">{c.heRef}</p>
-                        <p className="text-xs text-gray-600">{c.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
 

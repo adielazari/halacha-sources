@@ -28,7 +28,7 @@ export default function NavBar() {
             className="text-sm text-white/70 hover:text-leket-gold transition">
             🤖 סוכנים
           </Link>
-          <FontSettingsPanel />
+          <FontSettingsPanel dark />
           {!isHome && (
             <Link href="/" className="text-sm text-white/70 hover:text-leket-gold transition">
               ← בית
