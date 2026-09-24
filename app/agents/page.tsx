@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import type { AgentDefinition, AgentLanguage } from "@/lib/types";
 
 type EditableFields = { name: string; model: string; systemPrompt: string; language: AgentLanguage };
@@ -118,15 +116,9 @@ function AgentCard({ agent, onSaved, onDeleted }: {
 }
 
 export default function AgentsPage() {
-  const { status } = useSession();
-  const router = useRouter();
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -153,10 +145,6 @@ export default function AgentsPage() {
     } finally {
       setCreating(false);
     }
-  }
-
-  if (status === "loading") {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-leket-muted">טוען...</p></div>;
   }
 
   return (

@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import type { AgentDefinition, AgentLanguage, Annotation, Collection, CollectionSiman, CollectionWithSimanim, CommentaryEntry, Excerpt, Group, GroupMember, GroupRole, GroupSiman, GroupWithDetails, OrgMode, PracticalPoint } from "./types";
+import type { AgentDefinition, AgentLanguage, Annotation, Collection, CollectionSiman, CollectionWithSimanim, CommentaryEntry, Excerpt, OrgMode, PracticalPoint } from "./types";
 
 // Increment this whenever the schema changes — forces re-run after HMR reloads
 const SCHEMA_VERSION = 7;
@@ -30,16 +30,6 @@ function applySchema(db: Database.Database) {
       password_hash TEXT,
       role          TEXT NOT NULL DEFAULT 'user',
       created_at    TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS invitations (
-      id         TEXT PRIMARY KEY,
-      token      TEXT UNIQUE NOT NULL,
-      email      TEXT,
-      invited_by TEXT NOT NULL,
-      used_by    TEXT,
-      used_at    TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS collections (
@@ -131,62 +121,6 @@ function applySchema(db: Database.Database) {
     insertAgent.run(crypto.randomUUID(), "תובנות טכנולוגיות ויישומיות", "claude-fable-5", SEED_TECH_INSIGHTS_PROMPT, "he");
   }
 
-  // ── Groups (v2: no password, name not unique, join requests) ─────────────
-  // Migrate old groups table if it had password_hash
-  const groupCols = db.pragma("table_info(groups)") as { name: string }[];
-  if (groupCols.some((c) => c.name === "password_hash")) {
-    db.exec(`
-      ALTER TABLE groups RENAME TO groups_old;
-      DROP TABLE IF EXISTS group_members;
-      DROP TABLE IF EXISTS group_simanim;
-    `);
-  }
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS groups (
-      id         TEXT PRIMARY KEY,
-      name       TEXT NOT NULL,
-      created_by TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS group_members (
-      id        TEXT PRIMARY KEY,
-      group_id  TEXT NOT NULL,
-      user_id   TEXT NOT NULL,
-      role      TEXT NOT NULL DEFAULT 'read',
-      joined_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(group_id, user_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_gm_user  ON group_members(user_id);
-    CREATE INDEX IF NOT EXISTS idx_gm_group ON group_members(group_id);
-
-    CREATE TABLE IF NOT EXISTS group_join_requests (
-      id           TEXT PRIMARY KEY,
-      group_id     TEXT NOT NULL,
-      user_id      TEXT NOT NULL,
-      status       TEXT NOT NULL DEFAULT 'pending',
-      requested_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(group_id, user_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_gjr_group ON group_join_requests(group_id);
-
-    CREATE TABLE IF NOT EXISTS group_simanim (
-      id           TEXT PRIMARY KEY,
-      group_id     TEXT NOT NULL,
-      chelek       TEXT NOT NULL,
-      siman_number INTEGER NOT NULL,
-      added_by     TEXT NOT NULL,
-      added_at     TEXT DEFAULT (datetime('now')),
-      UNIQUE(group_id, chelek, siman_number)
-    );
-    CREATE INDEX IF NOT EXISTS idx_gs_group ON group_simanim(group_id);
-  `);
-
-  // Clean up old groups table after migration
-  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='groups_old'").get()) as { name: string } | undefined;
-  if (tables) db.exec("DROP TABLE groups_old");
-
   // ── Column migrations ────────────────────────────────────────────────────
   const annCols = db.pragma("table_info(annotations)") as { name: string }[];
   if (!annCols.some((c) => c.name === "user_id")) db.exec("ALTER TABLE annotations ADD COLUMN user_id TEXT");
@@ -271,19 +205,6 @@ export function getAllAnnotations(
     params.push(status);
   }
   query += " ORDER BY created_at ASC";
-  const rows = db.prepare(query).all(...params) as DbRow[];
-  return rows.map(rowToAnnotation);
-}
-
-export function getAllAnnotationsAdmin(status?: string): Annotation[] {
-  const db = getDb();
-  let query = "SELECT * FROM annotations";
-  const params: unknown[] = [];
-  if (status && status !== "all") {
-    query += " WHERE status = ?";
-    params.push(status);
-  }
-  query += " ORDER BY created_at DESC";
   const rows = db.prepare(query).all(...params) as DbRow[];
   return rows.map(rowToAnnotation);
 }
@@ -589,13 +510,6 @@ export type User = {
   createdAt: string;
 };
 
-export function getUserByEmail(email: string): User | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as Record<string, unknown> | undefined;
-  if (!row) return null;
-  return { id: row.id as string, name: row.name as string, email: row.email as string, passwordHash: row.password_hash as string | null, role: row.role as "user" | "admin", createdAt: row.created_at as string };
-}
-
 export function getUserById(id: string): User | null {
   const db = getDb();
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as Record<string, unknown> | undefined;
@@ -603,63 +517,17 @@ export function getUserById(id: string): User | null {
   return { id: row.id as string, name: row.name as string, email: row.email as string, passwordHash: row.password_hash as string | null, role: row.role as "user" | "admin", createdAt: row.created_at as string };
 }
 
-export function getAllUsers(): User[] {
+// The single local profile: oldest admin, else oldest user (see lib/localSession.ts).
+export function getPrimaryUser(): User | null {
   const db = getDb();
-  const rows = db.prepare("SELECT * FROM users ORDER BY created_at DESC").all() as Record<string, unknown>[];
-  return rows.map((row) => ({ id: row.id as string, name: row.name as string, email: row.email as string, passwordHash: row.password_hash as string | null, role: row.role as "user" | "admin", createdAt: row.created_at as string }));
+  const row = db.prepare("SELECT id FROM users ORDER BY (role = 'admin') DESC, created_at ASC LIMIT 1").get() as { id: string } | undefined;
+  return row ? getUserById(row.id) : null;
 }
 
 export function createUser(user: { id: string; name: string; email: string; passwordHash: string | null; role: "user" | "admin" }): User {
   const db = getDb();
   db.prepare("INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)").run(user.id, user.name, user.email, user.passwordHash, user.role);
   return getUserById(user.id)!;
-}
-
-export function updateUserRole(id: string, role: "user" | "admin"): void {
-  const db = getDb();
-  db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
-}
-
-export function hasAnyUser(): boolean {
-  const db = getDb();
-  const row = db.prepare("SELECT id FROM users LIMIT 1").get();
-  return !!row;
-}
-
-// ── Invitations ───────────────────────────────────────────────────────────────
-
-export type Invitation = {
-  id: string;
-  token: string;
-  email: string | null;
-  invitedBy: string;
-  usedBy: string | null;
-  usedAt: string | null;
-  createdAt: string;
-};
-
-export function createInvitation(inv: { id: string; token: string; email: string | null; invitedBy: string }): Invitation {
-  const db = getDb();
-  db.prepare("INSERT INTO invitations (id, token, email, invited_by) VALUES (?, ?, ?, ?)").run(inv.id, inv.token, inv.email, inv.invitedBy);
-  return getInvitationByToken(inv.token)!;
-}
-
-export function getInvitationByToken(token: string): Invitation | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM invitations WHERE token = ?").get(token) as Record<string, unknown> | undefined;
-  if (!row) return null;
-  return { id: row.id as string, token: row.token as string, email: row.email as string | null, invitedBy: row.invited_by as string, usedBy: row.used_by as string | null, usedAt: row.used_at as string | null, createdAt: row.created_at as string };
-}
-
-export function markInvitationUsed(token: string, userId: string): void {
-  const db = getDb();
-  db.prepare("UPDATE invitations SET used_by = ?, used_at = datetime('now') WHERE token = ?").run(userId, token);
-}
-
-export function getAllInvitations(): Invitation[] {
-  const db = getDb();
-  const rows = db.prepare("SELECT * FROM invitations ORDER BY created_at DESC").all() as Record<string, unknown>[];
-  return rows.map((row) => ({ id: row.id as string, token: row.token as string, email: row.email as string | null, invitedBy: row.invited_by as string, usedBy: row.used_by as string | null, usedAt: row.used_at as string | null, createdAt: row.created_at as string }));
 }
 
 // ── Collections ───────────────────────────────────────────────────────────────
@@ -770,193 +638,4 @@ export function getAnnotationCountsByChelek(chelek: string): { siman: string; co
   const db = getDb();
   const rows = db.prepare("SELECT siman, COUNT(*) as count FROM annotations WHERE chelek = ? AND status = 'approved' GROUP BY siman ORDER BY count DESC").all(chelek) as { siman: string; count: number }[];
   return rows;
-}
-
-// ── Groups ────────────────────────────────────────────────────────────────────
-
-function randomId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
-
-function rowToGroup(r: Record<string, unknown>): Group {
-  return { id: r.id as string, name: r.name as string, createdBy: r.created_by as string, createdAt: r.created_at as string };
-}
-function rowToGroupMember(r: Record<string, unknown>): GroupMember {
-  return { id: r.id as string, groupId: r.group_id as string, userId: r.user_id as string, userName: r.user_name as string, role: r.role as GroupRole, joinedAt: r.joined_at as string };
-}
-function rowToGroupSiman(r: Record<string, unknown>): GroupSiman {
-  return { id: r.id as string, groupId: r.group_id as string, chelek: r.chelek as string, simanNumber: r.siman_number as number, addedBy: r.added_by as string, addedAt: r.added_at as string };
-}
-
-export function createGroup(data: { id: string; name: string; createdBy: string }): Group {
-  const db = getDb();
-  db.prepare("INSERT INTO groups (id, name, created_by) VALUES (?, ?, ?)").run(data.id, data.name, data.createdBy);
-  db.prepare("INSERT INTO group_members (id, group_id, user_id, role) VALUES (?, ?, ?, 'owner')").run(randomId(), data.id, data.createdBy);
-  return getGroupById(data.id)!;
-}
-
-export function getGroupById(id: string): Group | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM groups WHERE id = ?").get(id) as Record<string, unknown> | undefined;
-  return row ? rowToGroup(row) : null;
-}
-
-export function searchGroupsByName(name: string): Group[] {
-  const db = getDb();
-  const rows = db.prepare("SELECT * FROM groups WHERE name LIKE ? ORDER BY created_at DESC LIMIT 20").all(`%${name}%`) as Record<string, unknown>[];
-  return rows.map(rowToGroup);
-}
-
-export function getUserGroups(userId: string): (Group & { myRole: GroupRole; pendingRequests: number })[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT g.*, gm.role as my_role,
-      (SELECT COUNT(*) FROM group_join_requests gjr WHERE gjr.group_id = g.id AND gjr.status = 'pending') as pending_requests
-    FROM groups g
-    JOIN group_members gm ON g.id = gm.group_id
-    WHERE gm.user_id = ?
-    ORDER BY g.created_at DESC
-  `).all(userId) as Record<string, unknown>[];
-  return rows.map((r) => ({ ...rowToGroup(r), myRole: r.my_role as GroupRole, pendingRequests: r.pending_requests as number }));
-}
-
-export function getGroupWithDetails(id: string, userId: string): GroupWithDetails | null {
-  const grp = getGroupById(id);
-  if (!grp) return null;
-  const db = getDb();
-  const memberRows = db.prepare(`
-    SELECT gm.*, u.name as user_name FROM group_members gm
-    JOIN users u ON gm.user_id = u.id
-    WHERE gm.group_id = ? ORDER BY gm.joined_at ASC
-  `).all(id) as Record<string, unknown>[];
-  const members = memberRows.map(rowToGroupMember);
-  const simanRows = db.prepare("SELECT * FROM group_simanim WHERE group_id = ? ORDER BY added_at ASC").all(id) as Record<string, unknown>[];
-  const simanim = simanRows.map(rowToGroupSiman);
-  const myMember = members.find((m) => m.userId === userId);
-  if (!myMember) return null;
-  return { ...grp, members, simanim, myRole: myMember.role };
-}
-
-export function getGroupMember(groupId: string, userId: string): GroupMember | null {
-  const db = getDb();
-  const row = db.prepare(`
-    SELECT gm.*, u.name as user_name FROM group_members gm
-    JOIN users u ON gm.user_id = u.id
-    WHERE gm.group_id = ? AND gm.user_id = ?
-  `).get(groupId, userId) as Record<string, unknown> | undefined;
-  return row ? rowToGroupMember(row) : null;
-}
-
-export function addGroupMember(data: { id: string; groupId: string; userId: string; role: GroupRole }): void {
-  const db = getDb();
-  db.prepare("INSERT OR IGNORE INTO group_members (id, group_id, user_id, role) VALUES (?, ?, ?, ?)").run(data.id, data.groupId, data.userId, data.role);
-}
-
-export function updateGroupMemberRole(groupId: string, userId: string, role: GroupRole): void {
-  getDb().prepare("UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?").run(role, groupId, userId);
-}
-
-export function removeGroupMember(groupId: string, userId: string): void {
-  getDb().prepare("DELETE FROM group_members WHERE group_id = ? AND user_id = ?").run(groupId, userId);
-}
-
-export function deleteGroup(id: string): void {
-  const db = getDb();
-  db.prepare("DELETE FROM group_join_requests WHERE group_id = ?").run(id);
-  db.prepare("DELETE FROM group_members WHERE group_id = ?").run(id);
-  db.prepare("DELETE FROM group_simanim WHERE group_id = ?").run(id);
-  db.prepare("DELETE FROM groups WHERE id = ?").run(id);
-}
-
-// ── Join requests ─────────────────────────────────────────────────────────────
-
-export type JoinRequest = {
-  id: string; groupId: string; userId: string; userName: string;
-  userEmail: string; status: "pending" | "approved" | "rejected"; requestedAt: string;
-};
-
-function rowToJoinRequest(r: Record<string, unknown>): JoinRequest {
-  return { id: r.id as string, groupId: r.group_id as string, userId: r.user_id as string, userName: r.user_name as string, userEmail: r.user_email as string, status: r.status as JoinRequest["status"], requestedAt: r.requested_at as string };
-}
-
-export function createJoinRequest(data: { id: string; groupId: string; userId: string }): "ok" | "already_member" | "already_requested" {
-  const db = getDb();
-  if (getGroupMember(data.groupId, data.userId)) return "already_member";
-  try {
-    db.prepare("INSERT INTO group_join_requests (id, group_id, user_id) VALUES (?, ?, ?)").run(data.id, data.groupId, data.userId);
-    return "ok";
-  } catch { return "already_requested"; }
-}
-
-export function getPendingJoinRequests(groupId: string): JoinRequest[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT gjr.*, u.name as user_name, u.email as user_email
-    FROM group_join_requests gjr JOIN users u ON gjr.user_id = u.id
-    WHERE gjr.group_id = ? AND gjr.status = 'pending'
-    ORDER BY gjr.requested_at ASC
-  `).all(groupId) as Record<string, unknown>[];
-  return rows.map(rowToJoinRequest);
-}
-
-export function getUserPendingRequests(userId: string): (JoinRequest & { groupName: string })[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT gjr.*, u.name as user_name, u.email as user_email, g.name as group_name
-    FROM group_join_requests gjr
-    JOIN users u ON gjr.user_id = u.id
-    JOIN groups g ON gjr.group_id = g.id
-    WHERE gjr.user_id = ? AND gjr.status = 'pending'
-    ORDER BY gjr.requested_at DESC
-  `).all(userId) as Record<string, unknown>[];
-  return rows.map((r) => ({ ...rowToJoinRequest(r), groupName: r.group_name as string }));
-}
-
-export function processJoinRequest(requestId: string, action: "approved" | "rejected"): void {
-  const db = getDb();
-  const req = db.prepare("SELECT * FROM group_join_requests WHERE id = ?").get(requestId) as Record<string, unknown> | undefined;
-  if (!req) return;
-  db.prepare("UPDATE group_join_requests SET status = ? WHERE id = ?").run(action, requestId);
-  if (action === "approved") {
-    db.prepare("INSERT OR IGNORE INTO group_members (id, group_id, user_id, role) VALUES (?, ?, ?, 'read')").run(randomId(), req.group_id, req.user_id);
-  }
-}
-
-// ── Group simanim ─────────────────────────────────────────────────────────────
-
-export function addSimanToGroup(data: { id: string; groupId: string; chelek: string; simanNumber: number; addedBy: string }): boolean {
-  try {
-    getDb().prepare("INSERT INTO group_simanim (id, group_id, chelek, siman_number, added_by) VALUES (?, ?, ?, ?, ?)").run(data.id, data.groupId, data.chelek, data.simanNumber, data.addedBy);
-    return true;
-  } catch { return false; }
-}
-
-export function removeSimanFromGroup(groupId: string, chelek: string, simanNumber: number): void {
-  getDb().prepare("DELETE FROM group_simanim WHERE group_id = ? AND chelek = ? AND siman_number = ?").run(groupId, chelek, simanNumber);
-}
-
-export function getGroupsForSiman(userId: string, chelek: string, simanNumber: number): (GroupSiman & { groupName: string; myRole: GroupRole })[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT gs.*, g.name as group_name, gm.role as my_role
-    FROM group_simanim gs
-    JOIN groups g ON gs.group_id = g.id
-    JOIN group_members gm ON g.id = gm.group_id AND gm.user_id = ?
-    WHERE gs.chelek = ? AND gs.siman_number = ?
-  `).all(userId, chelek, simanNumber) as Record<string, unknown>[];
-  return rows.map((r) => ({ ...rowToGroupSiman(r), groupName: r.group_name as string, myRole: r.my_role as GroupRole }));
-}
-
-export function getGroupMemberUserIds(groupId: string): string[] {
-  return (getDb().prepare("SELECT user_id FROM group_members WHERE group_id = ?").all(groupId) as { user_id: string }[]).map((r) => r.user_id);
-}
-
-// ── User search (for owner inviting members) ──────────────────────────────────
-
-export function searchUsers(query: string, excludeUserIds: string[]): { id: string; name: string; email: string }[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT id, name, email FROM users
-    WHERE (name LIKE ? OR email LIKE ?)
-    ORDER BY name ASC LIMIT 10
-  `).all(`%${query}%`, `%${query}%`) as { id: string; name: string; email: string }[];
-  return rows.filter((u) => !excludeUserIds.includes(u.id));
 }

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getLocalSession } from "@/lib/localSession";
 import HTMLtoDOCX from "html-to-docx";
-import { authOptions } from "@/lib/auth";
 import { getDocument } from "@/lib/db";
 import { renderSimanSection, buildFullHtml } from "@/lib/documentHtml";
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }

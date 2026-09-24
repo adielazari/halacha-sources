@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getLocalSession } from "@/lib/localSession";
 import { getDocument, saveDocument } from "@/lib/db";
 import type { Excerpt } from "@/lib/types";
 
+// Reads the local SQLite DB on every request — never prerender/cache at build.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }

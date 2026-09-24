@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getLocalSession } from "@/lib/localSession";
 import { getBlockAnalyses, upsertBlockAnalysis } from "@/lib/db";
 import { runClaudeStructured } from "@/lib/claudeCli";
 import { BLOCK_ANALYSIS_SYSTEM_PROMPT, BLOCK_ANALYSIS_JSON_SCHEMA, buildBlockPrompt } from "@/lib/blockAnalysisPrompt";
 import type { BlockAnalysisResult } from "@/lib/types";
 
+// Reads the local SQLite DB on every request — never prerender/cache at build.
+export const dynamic = "force-dynamic";
+
 // GET — all stored analyses for a siman, so the "לפי סעיפי שו״ע" view can
 // show "already analyzed" / stale state without the user having to click.
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }
@@ -39,7 +41,7 @@ type RequestBody = {
 // full content (not just what changed) — the stored row is fully replaced,
 // never merged.
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }

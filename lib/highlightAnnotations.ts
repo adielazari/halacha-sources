@@ -4,15 +4,14 @@ export function highlightAnnotations(
   html: string,
   annotations: Annotation[],
   sourceKey: string,
-  sectionIndex?: number,
-  currentUser?: string
+  sectionIndex?: number
 ): string {
   const relevant = annotations.filter(
     (a) =>
       a.sourceKey === sourceKey &&
       a.highlightText &&
       (sectionIndex === undefined || a.sectionIndex === sectionIndex) &&
-      (a.status === "approved" || (currentUser !== undefined && a.userName === currentUser))
+      a.status !== "rejected"
   );
 
   let result = html;
