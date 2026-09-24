@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getLocalSession } from "@/lib/localSession";
 import { getCollection, getCollectionSimanim, addSimanToCollection, removeSimanFromCollection, reorderCollectionSimanim } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) return NextResponse.json({ error: "אסור" }, { status: 401 });
   const { id } = await params;
   const coll = getCollection(id);
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) return NextResponse.json({ error: "אסור" }, { status: 401 });
   const { id } = await params;
   const coll = getCollection(id);

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { useStore } from "./store";
 import type { Excerpt } from "@/lib/types";
 
@@ -13,7 +12,6 @@ export type SaveState = "idle" | "saving" | "saved";
  * store already has. Server is authoritative once the initial GET resolves.
  */
 export function useDocumentAutosave(chelek: string, siman: string): SaveState {
-  const { status } = useSession();
   const excerpts = useStore((s) => s.excerpts);
   const expandedPanels = useStore((s) => s.expandedPanels);
   const loadDocument = useStore((s) => s.loadDocument);
@@ -21,10 +19,9 @@ export function useDocumentAutosave(chelek: string, siman: string): SaveState {
   const hydrated = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Fetch + hydrate once per (chelek, siman), only when authenticated.
+  // Fetch + hydrate once per (chelek, siman).
   useEffect(() => {
     hydrated.current = false;
-    if (status !== "authenticated") return;
 
     fetch(`/api/documents?chelek=${chelek}&siman=${siman}`)
       .then((r) => r.json())
@@ -33,11 +30,11 @@ export function useDocumentAutosave(chelek: string, siman: string): SaveState {
       })
       .catch(() => {/* keep localStorage copy on failure */})
       .finally(() => { hydrated.current = true; });
-  }, [chelek, siman, status, loadDocument]);
+  }, [chelek, siman, loadDocument]);
 
   // Debounced autosave whenever the document changes.
   useEffect(() => {
-    if (!hydrated.current || status !== "authenticated") return;
+    if (!hydrated.current) return;
 
     setSaveState("saving");
     clearTimeout(timer.current);
@@ -53,7 +50,7 @@ export function useDocumentAutosave(chelek: string, siman: string): SaveState {
 
     return () => clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [excerpts, expandedPanels, chelek, siman, status]);
+  }, [excerpts, expandedPanels, chelek, siman]);
 
   return saveState;
 }

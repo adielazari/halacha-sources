@@ -65,40 +65,6 @@ export type AgentDefinition = {
   updatedAt: string;
 };
 
-export type GroupRole = "owner" | "write" | "read";
-
-export type Group = {
-  id: string;
-  name: string;
-  createdBy: string;
-  createdAt: string;
-};
-
-export type GroupMember = {
-  id: string;
-  groupId: string;
-  userId: string;
-  userName: string;
-  role: GroupRole;
-  joinedAt: string;
-};
-
-export type GroupSiman = {
-  id: string;
-  groupId: string;
-  chelek: string;
-  simanNumber: number;
-  addedBy: string;
-  addedAt: string;
-};
-
-export type GroupWithDetails = Group & { members: GroupMember[]; simanim: GroupSiman[]; myRole: GroupRole; pendingRequests?: number };
-
-export type JoinRequest = {
-  id: string; groupId: string; userId: string; userName: string;
-  userEmail: string; status: "pending" | "approved" | "rejected"; requestedAt: string;
-};
-
 export type OrgMode = "topic" | "quantity" | "free";
 
 export type Collection = {

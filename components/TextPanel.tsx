@@ -20,7 +20,6 @@ interface TextPanelProps {
   sections?: Section[];
   html?: string;
   annotations?: Annotation[];
-  currentUser?: string;
   onSectionClick?: (sourceKey: string, sectionIndex: number, label: string) => void;
   heightPx?: number;
   onHeightChange?: (px: number) => void;
@@ -46,7 +45,6 @@ export default function TextPanel({
   sections,
   html,
   annotations,
-  currentUser,
   onSectionClick,
   heightPx,
   onHeightChange,
@@ -110,7 +108,7 @@ export default function TextPanel({
               className="text-sm leading-loose text-gray-800"
               dir="rtl"
               dangerouslySetInnerHTML={{
-                __html: highlightAnnotations(html, annotations ?? [], sourceKey, undefined, currentUser),
+                __html: highlightAnnotations(html, annotations ?? [], sourceKey),
               }}
             />
           ) : sections && sections.length > 0 ? (
@@ -183,8 +181,7 @@ export default function TextPanel({
                           sec.html,
                           annotations ?? [],
                           sourceKey,
-                          sec.index,
-                          currentUser
+                          sec.index
                         ),
                       }}
                     />

@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getLocalSession } from "@/lib/localSession";
 import { createCollection, getUserCollections } from "@/lib/db";
 import type { OrgMode } from "@/lib/types";
 import { randomUUID } from "crypto";
 
+// Reads the local SQLite DB on every request — never prerender/cache at build.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) return NextResponse.json({ error: "אסור" }, { status: 401 });
   return NextResponse.json(getUserCollections(session.user.id));
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) return NextResponse.json({ error: "אסור" }, { status: 401 });
 
   const body = await req.json() as { name?: string; orgMode?: OrgMode; chelek?: string; topic?: string };

@@ -14,8 +14,6 @@ import { toHebrewNumeral } from "@/lib/hebrewNumerals";
 import { getSimanTopic } from "@/lib/simanTopics";
 import { HeadingToolbar } from "@/components/HeadingToolbar";
 import type { HeadingAlign } from "@/components/HeadingToolbar";
-import { useUser } from "@/lib/userContext";
-import GroupSimanBanner from "@/components/GroupSimanBanner";
 import { useDocumentAutosave } from "./useDocumentAutosave";
 import type { ManualEntryPayload } from "@/components/AddManualSourceModal";
 import SourceViewModal from "@/components/SourceViewModal";
@@ -135,7 +133,6 @@ export default function SimanPage() {
     updateExcerptFields,
     reset,
   } = useStore();
-  const { currentUser } = useUser();
   const panelPrefs = usePanelPrefs();
   const panelDragKey = useRef<string | null>(null);
   const panelDropTargetRef = useRef<number | null>(null);
@@ -217,7 +214,6 @@ export default function SimanPage() {
           text: params.text,
           highlightText: params.text,
           sectionIndex: params.sectionIndex ?? null,
-          userName: currentUser,
         }),
       })
         .then((r) => r.json())
@@ -229,7 +225,7 @@ export default function SimanPage() {
         })
         .catch(() => {});
     },
-    [addExcerpt, chelek, number, currentUser, setExcerptAnnotationId]
+    [addExcerpt, chelek, number, setExcerptAnnotationId]
   );
 
   // Clicking a Beit Yosef paragraph's own letter-label to pick its SA se'if —
@@ -310,7 +306,6 @@ export default function SimanPage() {
               text: ex.text,
               highlightText,
               sectionIndex: ex.sectionIndex ?? null,
-              userName: currentUser,
             }),
           });
           const data: { annotation?: Annotation } = await res.json();
@@ -321,7 +316,7 @@ export default function SimanPage() {
         } catch { /* silent — will retry next mount */ }
       }
     })();
-  }, [excerpts, chelek, number, currentUser, setExcerptAnnotationId]);
+  }, [excerpts, chelek, number, setExcerptAnnotationId]);
 
   // Repair: excerpts pulled via "הגדר מקור" never had sectionIndex copied onto
   // the excerpt itself (only the linked annotation had it) — so the document's
@@ -517,7 +512,6 @@ export default function SimanPage() {
             sectionHtml: sourcePullContext?.sectionHtml ?? null,
             sourceRef: params.sourceRef ?? null,
             commentaries: params.commentaries ?? [],
-            userName: currentUser,
           }),
         })
           .then((r) => r.json())
@@ -531,7 +525,7 @@ export default function SimanPage() {
       }
       setSourcePullContext(null);
     },
-    [addExcerpt, updateExcerptFields, setExcerptAnnotationId, excerpts, chelek, number, currentUser, sourcePullContext]
+    [addExcerpt, updateExcerptFields, setExcerptAnnotationId, excerpts, chelek, number, sourcePullContext]
   );
 
   // Click on a highlighted <mark> → open a read-only view popup showing the
@@ -647,7 +641,6 @@ export default function SimanPage() {
             <span className="text-xs text-gray-400">
               {saveState === "saving" ? "שומר..." : saveState === "saved" ? "נשמר" : ""}
             </span>
-            <GroupSimanBanner chelek={chelek} simanNumber={parseInt(number, 10)} />
           </div>
         </div>
 
@@ -760,7 +753,6 @@ export default function SimanPage() {
                         onToggle={() => togglePanel(key)}
                         html={texts.tur?.text ?? ""}
                         annotations={annotations.filter((a) => a.sourceKey === key)}
-                        currentUser={currentUser}
                         heightPx={heightPx}
                         onHeightChange={(px) => panelPrefs.setHeight(key, px)}
                         draggable
@@ -785,7 +777,6 @@ export default function SimanPage() {
                           onToggle={() => togglePanel(key)}
                           sections={sections}
                           annotations={annotations.filter((a) => a.sourceKey === key)}
-                          currentUser={currentUser}
                           onSectionClick={key === "shulchanArukh" ? handleSectionClick : undefined}
                           maxSeif={isBeitYosef ? texts?.shulchanArukh?.text.length : undefined}
                           linkedSeifBySection={linkedSeifBySection}

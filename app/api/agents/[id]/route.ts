@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getLocalSession } from "@/lib/localSession";
 import { updateAgentDefinition, deleteAgentDefinition } from "@/lib/db";
 import type { AgentLanguage } from "@/lib/types";
 
@@ -8,7 +7,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }
@@ -35,7 +34,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = getLocalSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "אסור" }, { status: 401 });
   }
