@@ -6,9 +6,7 @@ const execFileAsync = promisify(execFile);
 // Local-dev-only helper: shells out to the developer's own authenticated
 // `claude` CLI (print mode) instead of the paid Anthropic API — this repo
 // only ever runs on the developer's machine, so there's no separate API key
-// to manage or bill. Uses --json-schema for validated structured output
-// instead of the manual instruct-then-parse-JSON pattern used elsewhere
-// (see app/api/agents/[id]/run/route.ts).
+// to manage or bill. Uses --json-schema for validated structured output.
 export async function runClaudeStructured<T>(
   systemPrompt: string,
   userPrompt: string,

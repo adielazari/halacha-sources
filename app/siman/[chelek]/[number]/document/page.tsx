@@ -9,10 +9,7 @@ import { downloadExport } from "@/lib/downloadExport";
 import { groupExcerpts } from "@/lib/groupExcerpts";
 import { AUTO_MATCHED_SEIF_SOURCE_KEYS, isExcerptHidden } from "@/lib/sourceLabels";
 import SourceViewModal from "@/components/SourceViewModal";
-import BlockAnalysisPanel from "@/components/BlockAnalysisPanel";
 import { ClosedEyeIcon } from "@/components/EyeIcon";
-
-type AgentSummary = { id: string; name: string };
 
 const CHELEK_LABELS: Record<string, string> = {
   OrachChayim: "אורח חיים",
@@ -97,16 +94,6 @@ function ExcerptItem({ ex, num, nested, onView, onSetLinkedSeif, onToggleHidden,
     );
   }
 
-  if (itemType === "agentPoint") {
-    return (
-      <div className="border-r-4 border-indigo-400 bg-indigo-50/40 rounded pr-4 py-2">
-        <p className="text-sm leading-loose text-gray-800">
-          <span className="ml-1">🤖</span>{ex.text}
-        </p>
-      </div>
-    );
-  }
-
   // source (default)
   return (
     <div
@@ -178,7 +165,6 @@ function ExcerptItem({ ex, num, nested, onView, onSetLinkedSeif, onToggleHidden,
           ))}
         </div>
       )}
-      <BlockAnalysisPanel sourceLabel={ex.sourceLabel} sourceText={ex.text} commentaries={ex.commentaries} />
     </div>
   );
 }
@@ -192,20 +178,10 @@ export default function DocumentPage() {
   const visibleExcerpts = excerpts.filter((e) => !isExcerptHidden(e));
   const hiddenExcerpts = excerpts.filter(isExcerptHidden);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [agents, setAgents] = useState<AgentSummary[]>([]);
-  const [runningAgentId, setRunningAgentId] = useState<string | null>(null);
-  const [runError, setRunError] = useState("");
   const [viewingExcerpt, setViewingExcerpt] = useState<Excerpt | null>(null);
   // Just for bounding the "→ קשר לסעיף" input — this page has no other need
   // for the raw Sefaria texts, so only the SA se'if count is kept.
   const [maxSeif, setMaxSeif] = useState<number | undefined>(undefined);
-
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((r) => (r.ok ? r.json() : { agents: [] }))
-      .then((data: { agents?: AgentSummary[] }) => setAgents(data.agents ?? []))
-      .catch(() => {/* silent */});
-  }, []);
 
   useEffect(() => {
     fetch(`/api/siman-texts?chelek=${chelek}&siman=${number}`)
@@ -215,28 +191,6 @@ export default function DocumentPage() {
       })
       .catch(() => {/* silent — bounding is a nicety, not required */});
   }, [chelek, number]);
-
-  async function handleRunAgent(agentId: string) {
-    setRunningAgentId(agentId);
-    setRunError("");
-    try {
-      const res = await fetch(`/api/agents/${agentId}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chelek, siman: number }),
-      });
-      const data = await res.json() as { document?: { excerpts: Excerpt[]; expandedPanels: Record<string, boolean> }; error?: string };
-      if (!res.ok || !data.document) {
-        setRunError(data.error || "הרצת הסוכן נכשלה");
-        return;
-      }
-      useStore.getState().loadDocument(data.document.excerpts, data.document.expandedPanels);
-    } catch {
-      setRunError("הרצת הסוכן נכשלה");
-    } finally {
-      setRunningAgentId(null);
-    }
-  }
 
   function handleSaveTxt() {
     const lines: string[] = [
@@ -375,29 +329,7 @@ export default function DocumentPage() {
         >
           הדפס
         </button>
-        {agents.map((agent) => (
-          <button
-            key={agent.id}
-            onClick={() => handleRunAgent(agent.id)}
-            disabled={runningAgentId !== null}
-            className="text-sm px-3 py-1.5 border border-indigo-300 text-indigo-700 rounded hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap"
-          >
-            {runningAgentId === agent.id ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="animate-spin inline-block">⏳</span> מריץ...
-              </span>
-            ) : (
-              <>🤖 הרץ: {agent.name}</>
-            )}
-          </button>
-        ))}
       </div>
-
-      {runError && (
-        <div className="no-print bg-red-50 border-b border-red-200 px-6 py-2 text-sm text-red-700">
-          {runError}
-        </div>
-      )}
 
       {/* Document body */}
       <div className="max-w-2xl mx-auto px-8 py-12">

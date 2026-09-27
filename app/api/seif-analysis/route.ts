@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLocalSession } from "@/lib/localSession";
 import { getBlockAnalyses, upsertBlockAnalysis } from "@/lib/db";
 import { runClaudeStructured } from "@/lib/claudeCli";
-import { BLOCK_ANALYSIS_SYSTEM_PROMPT, BLOCK_ANALYSIS_JSON_SCHEMA, buildBlockPrompt } from "@/lib/blockAnalysisPrompt";
+import {
+  SEIF_ANALYSIS_SYSTEM_PROMPT,
+  buildSeifJsonSchema,
+  buildSeifPrompt,
+  collectValidSourceLabels,
+  filterValidPracticalPoints,
+} from "@/lib/seifAnalysisPrompt";
 import type { BlockAnalysisResult } from "@/lib/types";
 
 // Reads the local SQLite DB on every request — never prerender/cache at build.
@@ -55,24 +61,27 @@ export async function POST(req: NextRequest) {
   }
   const sourceLabel = body.sourceLabel?.trim() || "מקור";
   const commentaries = Array.isArray(body.commentaries) ? body.commentaries : [];
+  const validLabels = collectValidSourceLabels(sourceLabel, commentaries);
 
-  const userPrompt = buildBlockPrompt(sourceLabel, sourceText, commentaries);
+  const userPrompt = buildSeifPrompt(sourceLabel, sourceText, commentaries);
 
   try {
     const result = await runClaudeStructured<BlockAnalysisResult>(
-      BLOCK_ANALYSIS_SYSTEM_PROMPT,
+      SEIF_ANALYSIS_SYSTEM_PROMPT,
       userPrompt,
-      BLOCK_ANALYSIS_JSON_SCHEMA
+      buildSeifJsonSchema(validLabels)
     );
 
     if (!result || typeof result.summary !== "string" || !Array.isArray(result.practical_points)) {
       return NextResponse.json({ error: "תשובה לא תקינה מהמודל" }, { status: 502 });
     }
 
+    const practicalPoints = filterValidPracticalPoints(result.practical_points, validLabels);
+
     const row = upsertBlockAnalysis({
       chelek, siman, seifIndex, contentHash,
       summary: result.summary,
-      practicalPoints: result.practical_points,
+      practicalPoints,
     });
 
     return NextResponse.json({ analysis: row });

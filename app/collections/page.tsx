@@ -5,14 +5,12 @@ import Link from "next/link";
 import type { Collection } from "@/lib/types";
 
 const MODE_LABELS: Record<string, string> = {
-  topic:    "לפי נושא",
-  quantity: "לפי כמות",
-  free:     "בחירה חופשית",
+  topic: "לפי נושא",
+  free:  "בחירה חופשית",
 };
 const MODE_ICONS: Record<string, string> = {
-  topic:    "🗂",
-  quantity: "📊",
-  free:     "✍️",
+  topic: "🗂",
+  free:  "✍️",
 };
 
 const CHELEK_LABELS: Record<string, string> = {

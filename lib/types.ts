@@ -4,7 +4,7 @@ export type CommentaryEntry = {
   text: string;
 };
 
-export type DocItemType = "source" | "explanation" | "question" | "answer" | "heading" | "agentPoint" | "image";
+export type DocItemType = "source" | "explanation" | "question" | "answer" | "heading" | "image";
 
 export type Excerpt = {
   id: string;
@@ -28,9 +28,6 @@ export type Excerpt = {
   parentId?: string;           // for answers: links to the parent question's id
   headingLevel?: 1 | 2 | 3;                   // for heading type: 1=large 2=medium 3=small
   headingAlign?: "right" | "center" | "left"; // for heading type: text alignment
-  // Set on the batch heading + every point produced by an agent run — lets a
-  // full previous run be found and replaced as one unit on rerun.
-  agentId?: string;
   // 0-based Shulchan Arukh se'if index this excerpt belongs to, set
   // manually by the user — there's no reliable automatic mapping for Tur/
   // Beit Yosef (unlike the SA-anchored mefarshim in HalachicBlock, see
@@ -48,6 +45,11 @@ export type PracticalPoint = {
   what: string;
   when?: string;
   how?: string;
+  // The exact source label (the block's main source, or one of its
+  // commentaries' heRef) this point is grounded in — validated server-side
+  // against the labels actually sent in the request, so the AI can't cite a
+  // source that wasn't part of its own input.
+  source: string;
 };
 
 export type BlockAnalysisResult = {
@@ -55,19 +57,7 @@ export type BlockAnalysisResult = {
   practical_points: PracticalPoint[];
 };
 
-export type AgentLanguage = "he" | "en";
-
-export type AgentDefinition = {
-  id: string;
-  name: string;
-  model: string;
-  systemPrompt: string;
-  language: AgentLanguage;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type OrgMode = "topic" | "quantity" | "free";
+export type OrgMode = "topic" | "free";
 
 export type Collection = {
   id: string;

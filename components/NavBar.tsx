@@ -24,10 +24,6 @@ export default function NavBar() {
             className="text-sm text-white/70 hover:text-leket-gold transition">
             קבצי לימוד
           </Link>
-          <Link href="/agents"
-            className="text-sm text-white/70 hover:text-leket-gold transition">
-            🤖 סוכנים
-          </Link>
           <FontSettingsPanel dark />
           {!isHome && (
             <Link href="/" className="text-sm text-white/70 hover:text-leket-gold transition">

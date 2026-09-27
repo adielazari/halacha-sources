@@ -16,9 +16,8 @@ const CHELEK_LABELS: Record<string, string> = {
 };
 
 const MODE_LABELS: Record<string, string> = {
-  topic:    "לפי נושא",
-  quantity: "לפי נושא",
-  free:     "בחירה חופשית",
+  topic: "לפי נושא",
+  free:  "בחירה חופשית",
 };
 
 const CHELAKOT = [

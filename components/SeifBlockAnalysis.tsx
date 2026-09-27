@@ -96,6 +96,7 @@ export default function SeifBlockAnalysis({
               <span className="font-medium">{p.what}</span>
               {p.when && <span className="text-gray-500"> — {p.when}</span>}
               {p.how && <span className="text-gray-500"> ({p.how})</span>}
+              {p.source && <span className="text-xs text-gray-400"> [{p.source}]</span>}
             </li>
           ))}
         </ul>

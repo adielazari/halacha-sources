@@ -39,10 +39,6 @@ function renderExcerpt(ex: Excerpt, index: number, nested = false): string {
     return `<div class="answer"><span class="label">תשובה: </span>${escapeHtml(ex.text)}</div>`;
   }
 
-  if (itemType === "agentPoint") {
-    return `<div class="agent-point">🤖 ${escapeHtml(ex.text)}</div>`;
-  }
-
   if (itemType === "image") {
     const caption = ex.sourceLabel && ex.sourceLabel !== "תמונה"
       ? `<p class="image-caption">${escapeHtml(ex.sourceLabel)}</p>`
@@ -143,7 +139,6 @@ export function buildFullHtml(sections: string[]): string {
   .explanation { border-right: 4px solid #4ade80; padding-right: 12px; margin: 8px 0; font-size: 13px; font-style: italic; color: #374151; }
   .question { border-right: 4px solid #fbbf24; padding-right: 12px; margin: 8px 0; font-size: 13px; font-weight: 600; color: #1f2937; }
   .answer { border-right: 4px solid #2dd4bf; padding-right: 12px; margin: 8px 0 8px 24px; font-size: 13px; color: #374151; }
-  .agent-point { border-right: 4px solid #818cf8; background: #eef2ff; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 13px; color: #312e81; }
   .source-image { margin: 8px 0; text-align: center; }
   .source-image img { max-width: 100%; border: 1px solid #e5e7eb; border-radius: 4px; }
   .image-caption { font-size: 11px; color: #6b7280; margin-top: 4px; }

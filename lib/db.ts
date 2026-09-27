@@ -2,19 +2,10 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 import { migrateAnnotationsToDocuments } from "./migrateAnnotations";
-import type { AgentDefinition, AgentLanguage, Collection, CollectionSiman, CollectionWithSimanim, Excerpt, OrgMode, PracticalPoint } from "./types";
+import type { Collection, CollectionSiman, CollectionWithSimanim, Excerpt, OrgMode, PracticalPoint } from "./types";
 
 // Increment this whenever the schema changes — forces re-run after HMR reloads
-const SCHEMA_VERSION = 8;
-
-const SEED_PRACTICAL_POINTS_PROMPT =
-  "אתה עוזר הלכתי. קיבלת את הטקסטים ההלכתיים הגולמיים של הסימן (טור, בית יוסף, שולחן ערוך, ט\"ז, ש\"ך, פתחי תשובה) וכן את קטעי המקורות שהמשתמש כבר בחר ותקצר בעצמו עבור סימן זה. " +
-  "המשימה שלך: לחלץ נקודות הלכה למעשה, מדויקות, מעשיות ותכליתיות, בתמצות נפלא, כך שקורא אותן ייקח מהן את הדברים הכי תכלסיים ליישום בחייו. " +
-  "כל נקודה צריכה להסתיים בציון המקור שממנו נלקחה, בסוגריים.";
-
-const SEED_TECH_INSIGHTS_PROMPT =
-  "אתה יועץ חזוני. בהתבסס על הטקסטים ההלכתיים של הסימן, הצע תובנות מציאותיות וטכנולוגיות: כיצד ניתן להרים ולקדם את קיום ההלכות הללו צעד למעלה בחיי היום-יום — בבית, בבית הכנסת, בעבודה, בלימודים, בצבא, ובכל מקום בארץ ישראל, במדינת ישראל ובעולם. " +
-  "הצע רעיונות לפיתוחים טכנולוגיים שיכולים לקדם את העולם התורני, ההלכתי והפרקטי של חיי תורה ומצוות ביום-יום ולאורך זמן, ושייתנו מענה הן לפעולות עכשוויות והן לעניינים עתידיים (כמו חיי המקדש, ימות המשיח, כשתהיה לנו ריבונות מלאה יותר).";
+const SCHEMA_VERSION = 9;
 
 const globalForDb = globalThis as unknown as {
   __db?: Database.Database;
@@ -65,16 +56,6 @@ function applySchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 
-    CREATE TABLE IF NOT EXISTS agent_definitions (
-      id            TEXT PRIMARY KEY,
-      name          TEXT NOT NULL,
-      model         TEXT NOT NULL,
-      system_prompt TEXT NOT NULL,
-      language      TEXT NOT NULL DEFAULT 'he',
-      created_at    TEXT DEFAULT (datetime('now')),
-      updated_at    TEXT DEFAULT (datetime('now'))
-    );
-
     -- One row per HalachicBlock (a Shulchan Arukh se'if + its mefaresh
     -- notes) that's been AI-analyzed, for the "לפי סעיפי שו״ע" view.
     -- content_hash is the block's contentHash at generation time — compared
@@ -93,15 +74,19 @@ function applySchema(db: Database.Database) {
     );
   `);
 
-  // Seed the two default agents once (idempotent — only runs while the table is empty)
-  const agentCount = (db.prepare("SELECT COUNT(*) as c FROM agent_definitions").get() as { c: number }).c;
-  if (agentCount === 0) {
-    const insertAgent = db.prepare(
-      "INSERT INTO agent_definitions (id, name, model, system_prompt, language) VALUES (?, ?, ?, ?, ?)"
-    );
-    insertAgent.run(crypto.randomUUID(), "נקודות הלכה למעשה", "claude-opus-4-8", SEED_PRACTICAL_POINTS_PROMPT, "he");
-    insertAgent.run(crypto.randomUUID(), "תובנות טכנולוגיות ויישומיות", "claude-fable-5", SEED_TECH_INSIGHTS_PROMPT, "he");
-  }
+  // The agents mechanism (custom prompts → points appended to a document) is
+  // removed — seif-analysis is the one remaining AI feature. Both seeded
+  // rows were always the stock prompts (never user-edited), and no saved
+  // document ever contained an agent-produced excerpt, so this is a plain
+  // drop, no migration.
+  db.exec(`DROP TABLE IF EXISTS agent_definitions;`);
+
+  // The "quantity" org mode was never actually different from "topic" (no
+  // code path ever branched on it beyond a display label/icon) — it rode on
+  // the annotations table (removed by the migration below, phase 3).
+  // Folding any leftover rows into "topic" keeps existing collections intact
+  // with identical rendering, rather than leaving them with a dangling mode.
+  db.exec(`UPDATE collections SET org_mode = 'topic' WHERE org_mode = 'quantity';`);
 
   // ── Panel highlights: annotations table → Excerpt.highlightText (one-time) ──
   // The local profile is resolved here directly (not via getPrimaryUser,
@@ -188,84 +173,6 @@ export function saveDocument(data: {
     DO UPDATE SET data = excluded.data, updated_at = datetime('now')
   `).run(crypto.randomUUID(), data.userId, data.chelek, data.siman, payload);
   return getDocument(data.userId, data.chelek, data.siman)!;
-}
-
-// ── Agent definitions ───────────────────────────────────────────────────────
-
-type AgentDefinitionRow = {
-  id: string;
-  name: string;
-  model: string;
-  system_prompt: string;
-  language: string;
-  created_at: string;
-  updated_at: string;
-};
-
-function rowToAgentDefinition(row: AgentDefinitionRow): AgentDefinition {
-  return {
-    id: row.id,
-    name: row.name,
-    model: row.model,
-    systemPrompt: row.system_prompt,
-    language: (row.language === "en" ? "en" : "he") as AgentLanguage,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-export function getAllAgentDefinitions(): AgentDefinition[] {
-  const db = getDb();
-  const rows = db.prepare("SELECT * FROM agent_definitions ORDER BY created_at ASC").all() as AgentDefinitionRow[];
-  return rows.map(rowToAgentDefinition);
-}
-
-export function getAgentDefinition(id: string): AgentDefinition | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM agent_definitions WHERE id = ?").get(id) as AgentDefinitionRow | undefined;
-  return row ? rowToAgentDefinition(row) : null;
-}
-
-export function createAgentDefinition(data: {
-  id: string;
-  name: string;
-  model: string;
-  systemPrompt: string;
-  language?: AgentLanguage;
-}): AgentDefinition {
-  const db = getDb();
-  db.prepare(
-    "INSERT INTO agent_definitions (id, name, model, system_prompt, language) VALUES (?, ?, ?, ?, ?)"
-  ).run(data.id, data.name, data.model, data.systemPrompt, data.language ?? "he");
-  return getAgentDefinition(data.id)!;
-}
-
-export function updateAgentDefinition(
-  id: string,
-  data: Partial<{ name: string; model: string; systemPrompt: string; language: AgentLanguage }>
-): AgentDefinition | null {
-  const db = getDb();
-  const fields: string[] = [];
-  const values: unknown[] = [];
-
-  if (data.name !== undefined) { fields.push("name = ?"); values.push(data.name); }
-  if (data.model !== undefined) { fields.push("model = ?"); values.push(data.model); }
-  if (data.systemPrompt !== undefined) { fields.push("system_prompt = ?"); values.push(data.systemPrompt); }
-  if (data.language !== undefined) { fields.push("language = ?"); values.push(data.language); }
-
-  if (fields.length === 0) return getAgentDefinition(id);
-
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  db.prepare(`UPDATE agent_definitions SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-  return getAgentDefinition(id);
-}
-
-export function deleteAgentDefinition(id: string): boolean {
-  const db = getDb();
-  const result = db.prepare("DELETE FROM agent_definitions WHERE id = ?").run(id);
-  return result.changes > 0;
 }
 
 // ── Block analyses (AI summary + practical points per HalachicBlock) ───────────

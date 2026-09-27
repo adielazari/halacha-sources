@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json() as { name?: string; orgMode?: OrgMode; chelek?: string; topic?: string };
   if (!body.name?.trim()) return NextResponse.json({ error: "שם חסר" }, { status: 400 });
-  if (!["topic", "quantity", "free"].includes(body.orgMode ?? "")) return NextResponse.json({ error: "מצב ארגון לא תקין" }, { status: 400 });
+  if (!["topic", "free"].includes(body.orgMode ?? "")) return NextResponse.json({ error: "מצב ארגון לא תקין" }, { status: 400 });
 
   const collection = createCollection({
     id: randomUUID(),
