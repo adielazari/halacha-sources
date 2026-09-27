@@ -151,6 +151,12 @@ export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpt
               </div>
             ))}
 
+            {block.uncertainSourceKeys.length > 0 && (
+              <p className="mt-2 text-xs text-amber-600">
+                ⚠️ מיפוי לא ודאי — {block.uncertainSourceKeys.map((k) => SOURCE_LABELS[k] ?? k).join(", ")} עלול להשתייך לסעיף אחר (חסר קישור בספריא)
+              </p>
+            )}
+
             {analysesLoaded && (
               <SeifBlockAnalysis
                 chelek={chelek}
@@ -161,6 +167,7 @@ export default function HalachicBlockView({ chelek, siman, blocks, linkedExcerpt
                 commentaries={commentariesForAnalysis}
                 contentHash={effectiveHash}
                 initialStored={storedByIndex[block.seifIndex] ?? null}
+                uncertainMapping={block.uncertainSourceKeys.length > 0}
               />
             )}
           </div>

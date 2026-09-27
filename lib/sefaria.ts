@@ -266,6 +266,11 @@ export type HalachicBlock = {
   saHtml: string;
   notes: HalachicBlockNote[];
   contentHash: string;
+  // Source keys present in this block's `notes` whose running-cursor total
+  // (across the whole siman) didn't land on that mefaresh's actual fetched
+  // note count — see the consistency check in buildSeifBlocks below. Empty
+  // when every mefaresh in this block partitioned cleanly.
+  uncertainSourceKeys: string[];
 };
 
 // Which directly-anchored-to-the-SA commentaries we currently know how to
@@ -323,7 +328,7 @@ export async function buildSeifBlocks(
 
   const cursors: Record<string, number> = {};
 
-  return saSeifim.map((saHtml, i) => {
+  const blocks = saSeifim.map((saHtml, i) => {
     const notes: HalachicBlockNote[] = [];
     for (const link of linksPerSeif[i]) {
       if (link.category !== "Commentary") continue;
@@ -343,6 +348,22 @@ export async function buildSeifBlocks(
 
     return { seifIndex: i, saHtml, notes, contentHash };
   });
+
+  // Consistency check (docs/plan §4.2): the running-cursor algorithm only
+  // partitions a mefaresh's array correctly if the per-se'if link COUNTS sum
+  // to exactly that mefaresh's fetched note count — one missing Sefaria link
+  // silently shifts every note after it by one se'if, with no other signal.
+  // A sourceKey whose total doesn't match is uncertain for the whole siman
+  // (we can't tell which se'if the drift started at), so every block that
+  // includes one of its notes gets flagged rather than just the tail end.
+  const uncertainSourceKeys = Object.keys(cursors).filter(
+    (key) => cursors[key] !== (mefarshim[key]?.length ?? 0)
+  );
+
+  return blocks.map((block) => ({
+    ...block,
+    uncertainSourceKeys: uncertainSourceKeys.filter((key) => block.notes.some((n) => n.sourceKey === key)),
+  }));
 }
 
 export async function fetchLinks(ref: string): Promise<Link[]> {

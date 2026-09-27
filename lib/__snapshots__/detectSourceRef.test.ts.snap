@@ -1,0 +1,172 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`detectSourceFromText — golden set > gemara — ברכות דף ג. 1`] = `
+{
+  "amud": "a",
+  "daf": 3,
+  "tractateEn": "Berakhot",
+  "tractateHe": "ברכות",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — ברכות דף כח: 1`] = `
+{
+  "amud": "b",
+  "daf": 28,
+  "tractateEn": "Berakhot",
+  "tractateHe": "ברכות",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — כריתות דף כה. 1`] = `
+{
+  "amud": "a",
+  "daf": 25,
+  "tractateEn": "Keritot",
+  "tractateHe": "כריתות",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — מגילה דף לא: 1`] = `
+{
+  "amud": "b",
+  "daf": 31,
+  "tractateEn": "Megillah",
+  "tractateHe": "מגילה",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — מנחות דף קי. 1`] = `
+{
+  "amud": "a",
+  "daf": 110,
+  "tractateEn": "Menachot",
+  "tractateHe": "מנחות",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — נדרים דף י. 1`] = `
+{
+  "amud": "a",
+  "daf": 10,
+  "tractateEn": "Nedarim",
+  "tractateHe": "נדרים",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — תמיד דף לב: 1`] = `
+{
+  "amud": "b",
+  "daf": 32,
+  "tractateEn": "Tamid",
+  "tractateHe": "תמיד",
+  "type": "mishna",
+}
+`;
+
+exports[`detectSourceFromText — golden set > gemara — תענית דף כז: 1`] = `
+{
+  "amud": "b",
+  "daf": 27,
+  "tractateEn": "Taanit",
+  "tractateHe": "תענית",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > multi-char Hebrew numeral verse ref 1`] = `
+{
+  "book": {
+    "en": "Psalms",
+    "he": "תהלים",
+  },
+  "chapter": 27,
+  "type": "tanakh",
+  "verse": undefined,
+}
+`;
+
+exports[`detectSourceFromText — golden set > plain prose with no embedded ref 1`] = `null`;
+
+exports[`detectSourceFromText — golden set > rambam — alternate spelling ביכורים normalizes to בכורים 1`] = `
+{
+  "type": "rambam",
+}
+`;
+
+exports[`detectSourceFromText — golden set > rambam — bare mention, no hilchot section 1`] = `
+{
+  "type": "rambam",
+}
+`;
+
+exports[`detectSourceFromText — golden set > rambam — hilchot section with chapter 1`] = `
+{
+  "chapter": 5,
+  "halacha": undefined,
+  "hilkhotHe": "הלכות בכורים",
+  "sefRef": "Mishneh_Torah,_First_Fruits_and_other_Gifts_to_Priests_Outside_the_Sanctuary",
+  "type": "rambam",
+}
+`;
+
+exports[`detectSourceFromText — golden set > rambam — מהל' abbreviation 1`] = `
+{
+  "chapter": 1,
+  "halacha": undefined,
+  "hilkhotHe": "הלכות תפילה",
+  "sefRef": "Mishneh_Torah,_Prayer_and_the_Priestly_Blessing",
+  "type": "rambam",
+}
+`;
+
+exports[`detectSourceFromText — golden set > rambam — ר"פ chapter-first form 1`] = `
+{
+  "chapter": 5,
+  "halacha": undefined,
+  "hilkhotHe": "הלכות בכורים",
+  "sefRef": "Mishneh_Torah,_First_Fruits_and_other_Gifts_to_Priests_Outside_the_Sanctuary",
+  "type": "rambam",
+}
+`;
+
+exports[`detectSourceFromText — golden set > tanakh book chapter:verse 1`] = `
+{
+  "book": {
+    "en": "Genesis",
+    "he": "בראשית",
+  },
+  "chapter": 2,
+  "type": "tanakh",
+  "verse": 3,
+}
+`;
+
+exports[`detectSourceFromText — golden set > tractate name containing a Tanakh book substring (בכורות ⊃ רות) 1`] = `
+{
+  "amud": "a",
+  "daf": 27,
+  "tractateEn": "Bekhorot",
+  "tractateHe": "בכורות",
+  "type": "gemara",
+}
+`;
+
+exports[`detectSourceFromText — golden set > yerushalmi marker changes type 1`] = `
+{
+  "amud": undefined,
+  "chapter": 1,
+  "daf": undefined,
+  "halacha": undefined,
+  "mishna": undefined,
+  "tractateEn": "Berakhot",
+  "tractateHe": "ברכות",
+  "type": "yerushalmi",
+}
+`;

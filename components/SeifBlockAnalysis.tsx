@@ -12,6 +12,11 @@ type Props = {
   commentaries: { heRef: string; text: string }[];
   contentHash: string;
   initialStored: BlockAnalysisRow | null;
+  // The se'if-mapping consistency check (lib/sefaria.ts buildSeifBlocks)
+  // found a mefaresh whose notes might belong to a different se'if — require
+  // an explicit confirmation before generating/saving, rather than silently
+  // persisting an analysis built on possibly-misplaced commentary.
+  uncertainMapping?: boolean;
 };
 
 // Small, unobtrusive AI trigger at the bottom of a HalachicBlock — the
@@ -20,13 +25,14 @@ type Props = {
 // document page) so a version/contentHash can survive across visits and
 // flag staleness without ever deleting the previous analysis.
 export default function SeifBlockAnalysis({
-  chelek, siman, seifIndex, sourceLabel, sourceText, commentaries, contentHash, initialStored,
+  chelek, siman, seifIndex, sourceLabel, sourceText, commentaries, contentHash, initialStored, uncertainMapping,
 }: Props) {
   const [stored, setStored] = useState<BlockAnalysisRow | null>(initialStored);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [openSummary, setOpenSummary] = useState(false);
   const [openPractical, setOpenPractical] = useState(false);
+  const [confirmingUncertain, setConfirmingUncertain] = useState(false);
 
   const isStale = stored !== null && stored.contentHash !== contentHash;
 
@@ -52,12 +58,27 @@ export default function SeifBlockAnalysis({
     }
   }
 
+  // Routes through the uncertain-mapping confirmation gate instead of
+  // generating (and saving) directly.
+  function requestGenerate() {
+    if (uncertainMapping) {
+      setConfirmingUncertain(true);
+      return;
+    }
+    void generate();
+  }
+
+  function confirmAndGenerate() {
+    setConfirmingUncertain(false);
+    void generate();
+  }
+
   function toggle(section: "summary" | "practical", e: React.MouseEvent) {
     e.stopPropagation();
     const setOpen = section === "summary" ? setOpenSummary : setOpenPractical;
     const isOpen = section === "summary" ? openSummary : openPractical;
     if (!stored && !isOpen) {
-      void generate();
+      requestGenerate();
     }
     setOpen(!isOpen);
   }
@@ -76,10 +97,22 @@ export default function SeifBlockAnalysis({
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
-      {isStale && (openSummary || openPractical) && (
+      {confirmingUncertain && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-center gap-2">
+          <span>⚠️ מיפוי המפרשים לסעיף זה לא ודאי (חסר קישור בספריא) — ליצור בכל זאת ניתוח על בסיסו?</span>
+          <button onClick={(e) => { e.stopPropagation(); confirmAndGenerate(); }} className="underline hover:text-amber-900 whitespace-nowrap">
+            כן, המשך
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setConfirmingUncertain(false); }} className="text-gray-500 hover:text-gray-700 whitespace-nowrap">
+            ביטול
+          </button>
+        </div>
+      )}
+
+      {isStale && !confirmingUncertain && (openSummary || openPractical) && (
         <div className="text-xs text-amber-600 flex items-center gap-1.5">
           <span>↻ נוספו מקורות מאז יצירת הסיכום</span>
-          <button onClick={(e) => { e.stopPropagation(); void generate(); }} disabled={loading} className="underline hover:text-amber-800 disabled:opacity-50">
+          <button onClick={(e) => { e.stopPropagation(); requestGenerate(); }} disabled={loading} className="underline hover:text-amber-800 disabled:opacity-50">
             עדכן ניתוח
           </button>
         </div>

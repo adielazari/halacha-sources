@@ -10,8 +10,7 @@ import type { TanakhBook } from "@/lib/tanakhBooks";
 import { buildMishnaRef } from "@/lib/refBuilder";
 import { SOURCE_LABELS } from "@/lib/sourceLabels";
 import { stripHtml, findSegmentRefs, parseTalmudRef, TRACTATE_HE } from "@/lib/refUtils";
-import { parseSourcesFromSeifim } from "@/lib/parser";
-import { detectSourceFromText } from "@/lib/detectSourceRef";
+import { detectSource } from "@/lib/sourceDetection";
 import { toHebrewNumeral, fromHebrewNumeral } from "@/lib/hebrewNumerals";
 import { RISHON_MAP, RISHONIM_ENTRIES, AHARONIM_ENTRIES, buildRishonRef } from "@/lib/rishonimMap";
 import CommentatorSuggestions from "./CommentatorSuggestions";
@@ -247,9 +246,10 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
   useEffect(() => {
     if (!context.text) return;
 
-    // Try the focused detector first (handles chapter forms, מ"X, ה"X, etc.)
-    const detected = detectSourceFromText(context.text);
-    if (detected) {
+    const result = detectSource(context.text);
+
+    if (result.kind === "focused") {
+      const detected = result.detected;
       if (detected.type === "sifri") {
         setSourceType("midrash");
         setMidrashFamily("sifrei");
@@ -304,12 +304,8 @@ export default function SourcePullView({ context, onBack, onAddToDoc }: Props) {
       return;
     }
 
-    // Fall back: use the full Beit Yosef parser for any remaining daf-form citations
-    const parsed = parseSourcesFromSeifim([context.text]);
-    if (!parsed.length) return;
-    const first = parsed[0];
-    if (first.sefariaRef) {
-      const p = parseTalmudRef(first.sefariaRef);
+    if (result.kind === "fallback" && result.parsed.sefariaRef) {
+      const p = parseTalmudRef(result.parsed.sefariaRef);
       if (p) {
         const entry = Object.entries(TRACTATE_MAP).find(([, v]) => v === p.tractate);
         if (entry) setTractate(entry[0]);

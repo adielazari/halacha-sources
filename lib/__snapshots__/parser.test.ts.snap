@@ -1,0 +1,117 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseSourcesFromSeifim — golden set > author writing verb, no locatable ref 1`] = `
+[
+  {
+    "author": "רא"ש",
+    "raw": "וכתב הרא"ש",
+    "sefariaRef": undefined,
+    "seifIndex": 0,
+    "unresolved": true,
+    "unresolvedHint": "הגדר מקור לרא"ש",
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > chapter+tractate+daf dedup — wider resolved match wins 1`] = `
+[
+  {
+    "book": "קידושין",
+    "raw": "בפ"ב דקידושין [נו:]",
+    "section": "דף נו",
+    "sefariaRef": "Kiddushin.56b",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > gemara in brackets 1`] = `
+[
+  {
+    "book": "ברכות",
+    "raw": "ברכות [כח:]",
+    "section": "דף כח",
+    "sefariaRef": "Berakhot.28b",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > gemara in parens 1`] = `
+[
+  {
+    "book": "ברכות",
+    "raw": "ברכות יב.",
+    "section": "דף יב",
+    "sefariaRef": "Berakhot.12a",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > gemara plain form 1`] = `
+[
+  {
+    "book": "ברכות",
+    "raw": "ברכות ג.",
+    "section": "דף ג",
+    "sefariaRef": "Berakhot.3a",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > gemara with amud bet 1`] = `
+[
+  {
+    "book": "תמיד",
+    "raw": "תמיד לב:",
+    "section": "דף לב",
+    "sefariaRef": "Tamid.32b",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > plain prose with no embedded ref 1`] = `[]`;
+
+exports[`parseSourcesFromSeifim — golden set > rambam full hilchot name 1`] = `
+[
+  {
+    "author": "רמב"ם",
+    "book": "הלכות מעשר שני ונטע רבעי",
+    "raw": "הרמב"ם בפ"ט מהלכות מעשר שני ונטע רבעי",
+    "section": "פרק ט",
+    "sefariaRef": "Mishneh_Torah%2C_Laws_of_Maaser_Sheni_and_Neta_Revai.9",
+    "seifIndex": 0,
+  },
+]
+`;
+
+exports[`parseSourcesFromSeifim — golden set > two authors + shared tractate/daf 1`] = `
+[
+  {
+    "author": "רי"ף",
+    "book": "יבמות",
+    "raw": "וכתבו הרי"ף והרא"ש בפירוש (יבמות דף פג:)",
+    "section": "דף פג",
+    "sefariaRef": "Rif_on_Yevamot",
+    "seifIndex": 0,
+  },
+  {
+    "author": "רא"ש",
+    "book": "יבמות",
+    "raw": "וכתבו הרי"ף והרא"ש בפירוש (יבמות דף פג:)",
+    "section": "דף פג",
+    "sefariaRef": "Rosh_on_Yevamot",
+    "seifIndex": 0,
+  },
+  {
+    "book": "יבמות",
+    "raw": "וכתבו הרי"ף והרא"ש בפירוש (יבמות דף פג:)",
+    "section": "דף פג",
+    "sefariaRef": "Yevamot.83b",
+    "seifIndex": 0,
+  },
+]
+`;
